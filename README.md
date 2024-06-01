@@ -1,1 +1,1 @@
-# Deep-Reinforcement-Learing
+# Deep Reinforcement Learning
