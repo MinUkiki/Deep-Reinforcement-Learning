@@ -37,7 +37,7 @@ def transition_probabilities(state, action):
     else:
         for next_action in actions:
             if next_action == action:
-                # 주어진 행동에 대한 다음 상태로 이동할 확률은 0.8입니다.
+                # 주어진 행동에 대한 다음 상태로 이동할 확률은 0.7입니다.
                 next_states.append(get_next_state(state, next_action))
                 prob.append(0.7)
             else:
@@ -90,7 +90,7 @@ def value_iteration(grid_height, grid_width, gamma, theta, max_iterations):
             for j in range(grid_width):
                 max_value = float("-inf")
                 state = (i,j)
-                if state == obstacles[0]: # 장애물은 value를 계산 하지 않음
+                if state in obstacles: # 장애물은 value를 계산 하지 않음
                     continue
                 v = V[state]
                 # 각 행동에 대한 기대 보상 계산
