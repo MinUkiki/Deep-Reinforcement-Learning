@@ -1,20 +1,24 @@
 import numpy as np
+import random
 from collections import defaultdict
 '''
 다양한 MC 방법들
 '''
 first_visit = True # first or every
-constant_alpha = False # Constant-alpha
-use_epsilon = True
-size = 4
+constant_alpha = True # Constant-alpha
+use_epsilon = True # MC control
+decrease_epsilon = False # GLIE MC control
+height_size = 4
+width_size = 4
 
 class GridWorld:
-    def __init__(self, size=size):
-        self.size = size
+    def __init__(self, height_size=height_size, width_size=width_size):
+        self.height_size = height_size
+        self.width_size = width_size
         self.reset()
         self.action_space = [0, 1, 2, 3] # 상 하 좌 우
-        self.state_space = [(i, j) for i in range(size) for j in range(size)]
-        self.goal_state = (size-1, size-1)
+        self.state_space = [(i, j) for i in range(height_size) for j in range(width_size)]
+        self.goal_state = (height_size-1, width_size-1)
     
     def reset(self):
         self.state = (0, 0)
@@ -24,11 +28,11 @@ class GridWorld:
         x, y = self.state
         if action == 0 and x > 0:  # 상
             x -= 1
-        elif action == 1 and x < self.size - 1:  # 하
+        elif action == 1 and x < self.height_size - 1:  # 하
             x += 1
         elif action == 2 and y > 0:  # 좌
             y -= 1
-        elif action == 3 and y < self.size - 1:  # 우
+        elif action == 3 and y < self.width_size - 1:  # 우
             y += 1
         self.state = (x, y)
         reward = 1 if self.state == self.goal_state else 0 # 보상 
@@ -44,14 +48,14 @@ class GridWorld:
 env = GridWorld()
 
 class MonteCarloAgent:
-    def __init__(self, gamma=1.0, epsilon=0.1):
+    def __init__(self, gamma=1.0, epsilon=0.9):
         self.env = env
         self.gamma = gamma
         self.epsilon = epsilon
-        self.value_table = defaultdict(float) # 상태 가치 함수
-        self.returns = defaultdict(list)
-    
-    # PE
+        self.q_table = np.zeros((env.height_size,env.width_size,len(env.action_space))) # 액션 가치 함수
+        self.returns = defaultdict(list) # MC Prediction
+        self.constant_epsilon = self.epsilon
+    # (a)
     def generate_episode(self, policy):
         episode = []
         done = False
@@ -63,52 +67,68 @@ class MonteCarloAgent:
             state = next_state
         return episode
     
-    def update_value_function(self, episode, alpha):
+    def update_q_function(self, episode, alpha):
         visited_states = set()
         G = 0
-        for state, _, reward in reversed(episode):
+        for state, action, reward in reversed(episode):
             if first_visit:
                 if state not in visited_states:
                     visited_states.add(state)
                 else:
                     continue
             G = self.gamma * G + reward
-            self.returns[state].append(G)
+            x,y = state
             if constant_alpha:
-                self.value_table[state] = (1-alpha)*self.value_table[state] + alpha*G
+                self.q_table[x,y,action] = (1-alpha)*self.q_table[x,y,action] + alpha*G
             else:
-                self.value_table[state] = np.mean(self.returns[state])
-        
+                self.returns[state].append(G)
+                self.q_table[x,y,action] = np.mean(self.returns[state])
+            if decrease_epsilon:
+                self.epsilon -= self.constant_epsilon/episodes
+                
     def policy(self, state):
-        # if use_epsilon: # epsilon 사용 여부
-        #     action = np.argmax(self.value_table[state])
-        #     a = 1-self.epsilon + self.epsilon/len(self.env.action_space)
-        #     if np.random.rand() < a:
-        #         return action
-        #     else:
-        #         pass
-        # else:
-        #     return np.random.choice(env.action_space)
-        return np.random.choice(env.action_space)
+        x,y = state
+        rand = random.random()
+        if rand < self.epsilon:
+            return np.random.choice(env.action_space)
+        else:
+            return np.argmax(self.q_table[x,y])
     
     def train(self, episodes):
         alpha = 0.001
         for _ in range(episodes):
             episode = self.generate_episode(self.policy)
-            self.update_value_function(episode,alpha)
+            self.update_q_function(episode,alpha)
 
 # 에이전트 생성 및 학습
+episodes = 5000
 agent = MonteCarloAgent(gamma=0.9)
-agent.train(episodes=5000)
+agent.train(episodes=episodes)
 
-table = []
-for i in range(size):
-    row = [0] * size  # 각 행을 [0, 0, 0, 0]으로 초기화
-    table.append(row)
+table_q = []
+table_a = []
+for i in range(height_size):
+    Q = [0] * height_size  # 각 행을 [0, 0, 0, 0]으로 초기화
+    A = [0] * height_size  # 각 행을 [0, 0, 0, 0]으로 초기화
+    table_q.append(Q)
+    table_a.append(A)
 
 # 상태 가치 함수 출력
-for state, value in agent.value_table.items():
-    table[state[0]][state[1]] = value
+for i in range(len(agent.q_table)):
+    for j in range(len(agent.q_table)):
+        table_q[i][j]=max(agent.q_table[i][j]) # 최대 행동 가치 함수
+        a = np.argmax(agent.q_table[i][j])
+        if a == 0:
+            table_a[i][j] = "상"
+        elif a == 1:
+            table_a[i][j] = "하"
+        elif a == 2:
+            table_a[i][j] = "좌"
+        elif a == 3:
+            table_a[i][j] = "우"
 
-for a in table:
-    print(', '.join(map(str, a)))
+for q in table_q:
+    print(', '.join(map(str, q)))
+
+for a in table_a:
+    print(', '.join(a))
