@@ -1,5 +1,9 @@
 # Deep Reinforcement Learning
 
+```
+pip install -r requirements.txt
+pip install gym[all]
+```
 ## Grid world
 
 1. Value Iteration
