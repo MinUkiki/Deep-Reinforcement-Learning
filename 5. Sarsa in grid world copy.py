@@ -1,13 +1,6 @@
 import numpy as np
 import random
-from collections import defaultdict
-'''
-다양한 MC 방법들
-'''
-first_visit = True # first or every
-constant_alpha = True # Constant-alpha
-use_epsilon = True # MC control
-decrease_epsilon = False # GLIE MC control
+
 height_size = 4
 width_size = 4
 
@@ -35,7 +28,7 @@ class GridWorld:
         elif action == 3 and y < self.width_size - 1:  # 우
             y += 1
         self.state = (x, y)
-        reward = 1 if self.state == self.goal_state else 0 # 보상 
+        reward = 0 if self.state == self.goal_state else -1 # 보상 
         done = self.state == self.goal_state # 에피소드 종료 유무
         return self.state, reward, done, {}
 
@@ -48,62 +41,40 @@ class GridWorld:
 env = GridWorld()
 env.render()
 
-class MonteCarloAgent:
-    def __init__(self, gamma=1.0, epsilon=0.9):
+class SarsaAgent:
+    def __init__(self, gamma, alpha=0.1, epsilon=0.9):
         self.env = env
         self.gamma = gamma
+        self.alpha = alpha
         self.epsilon = epsilon
-        self.q_table = np.zeros((env.height_size,env.width_size,len(env.action_space))) # 액션 가치 함수
-        self.returns = defaultdict(list) # MC Prediction
         self.constant_epsilon = self.epsilon
-    # (a)
-    def generate_episode(self, policy):
-        episode = []
-        done = False
-        state = self.env.reset()
-        while not done:
-            action = policy(state)
-            next_state, reward, done, _ = self.env.step(action)
-            episode.append((state, action, reward))
-            state = next_state
-        return episode
+        self.q_table = np.zeros((env.height_size,env.width_size,len(env.action_space)))
     
-    def update_q_function(self, episode, alpha):
-        visited_states = set()
-        G = 0
-        for state, action, reward in reversed(episode):
-            if first_visit:
-                if state not in visited_states:
-                    visited_states.add(state)
-                else:
-                    continue
-            G = self.gamma * G + reward
-            x,y = state
-            if constant_alpha:
-                self.q_table[x,y,action] = (1-alpha)*self.q_table[x,y,action] + alpha*G
-            else:
-                self.returns[state].append(G)
-                self.q_table[x,y,action] = np.mean(self.returns[state])
-            if decrease_epsilon:
-                self.epsilon -= self.constant_epsilon/episodes
-                
     def policy(self, state):
         x,y = state
         if random.random() < self.epsilon:
             return np.random.choice(env.action_space)
         else:
             return np.argmax(self.q_table[x,y])
-    
-    def train(self, episodes):
-        alpha = 0.001
-        for _ in range(episodes):
-            episode = self.generate_episode(self.policy)
-            self.update_q_function(episode,alpha)
 
+    def train(self, episodes):
+        for _ in range(episodes):
+            done = False
+            state = self.env.reset()
+            action = self.policy(state)
+            while not done:
+                next_state, reward, done, _ = self.env.step(action)
+                next_action = self.policy(next_state)
+                x,y = state
+                next_x, next_y = next_state
+                q_target = reward + self.gamma*self.q_table[next_x, next_y,next_action]
+                self.q_table[x,y,action] += self.alpha*( q_target - self.q_table[x,y,action])
+                
+                state, action = next_state, next_action
+    
 # 에이전트 생성 및 학습
-episodes = 5000
-agent = MonteCarloAgent(gamma=0.9)
-agent.train(episodes=episodes)
+agent = SarsaAgent(gamma=0.99)
+agent.train(episodes=1000)
 
 # 행동 가치 함수 출력
 for state in agent.env.state_space:
