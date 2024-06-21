@@ -5,7 +5,18 @@
 ![img](../images/Pendulum.gif)
 
 ## Impormation
+
 ![alt text](../images/Pendulum_impormation.png)
+
+### Description
+
+![alt text](../images/Pendulum_description.png)
+
+`x-y` : 길이
+
+`theta` : 라디안 각도
+
+`tau` : 반시계 방향의 양수
 
 ### action space
 
