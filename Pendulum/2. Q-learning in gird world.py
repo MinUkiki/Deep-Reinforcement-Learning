@@ -27,7 +27,7 @@ def policy(angle, velocity):
         action = np.argmax(q_table[angle, velocity])
     return np.array([action_bins[action]], dtype=np.float32)
 
-episodes = 100
+episodes = 1000
 gamma = 0.99
 alpha = 0.1
 epsilon = 0.9
@@ -41,21 +41,19 @@ for episode in range(episodes):
     truncated = False
     state, _ = env.reset()
     angle, velocity = discrete_state(state)
-    action = policy(angle, velocity)
     episode_reward = 0
 
     while not terminated and not truncated:
+        action = policy(angle, velocity)
         next_state, reward, terminated, truncated, _ = env.step(action)
         next_angle, next_velocity = discrete_state(next_state)
-        next_action = policy(next_angle, next_velocity)
 
         dis_action = discrete_action(action)
-        dis_next_action = discrete_action(next_action)
 
-        q_target = reward + gamma * q_table[next_angle, next_velocity, dis_next_action[0]]
+        q_target = reward + gamma * np.max(q_table[next_angle, next_velocity])
         q_table[angle, velocity, dis_action[0]] += alpha * (q_target - q_table[angle, velocity, dis_action[0]])
 
-        angle, velocity, action = next_angle, next_velocity, next_action
+        angle, velocity = next_angle, next_velocity
         episode_reward += reward
 
     total_rewards.append(episode_reward)
