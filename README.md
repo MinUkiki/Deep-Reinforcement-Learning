@@ -1,9 +1,8 @@
 # Deep Reinforcement Learning
 
-```
-pip install -r requirements.txt
-pip install gym[all]
-```
+use gymnasium
+[download](https://minukiki.github.io/ai/OpenaiGym/)
+
 ## Grid world
 
 1. Value Iteration
