@@ -36,7 +36,7 @@ class GridWorld:
         grid = np.zeros((self.height_size, self.width_size), dtype=int)
         x, y = self.goal_state
         grid[x, y] = 1
-        print(f"{grid}\n{"-"*50}")
+        print(f"{grid}\n{'-'*50}")
 
 env = GridWorld()
 env.render()
@@ -88,7 +88,7 @@ def get_policy(Q):
     return policy
 
 policy = get_policy(agent.q_table)
-print(f"{"-"*50} \nOptimal Policy (0: Up, 1: Down, 2: Left, 3: Right): ")
+print(f"{'-'*50} \nOptimal Policy (0: Up, 1: Down, 2: Left, 3: Right): ")
 print(policy)
 
 def visualize_policy(policy):
@@ -97,5 +97,5 @@ def visualize_policy(policy):
     for row in policy_symbols:
         print(' '.join(row))
 
-print(f"{"-"*50} \nOptimal Policy Symbol:")
+print(f"{'-'*50} \nOptimal Policy Symbol:")
 visualize_policy(policy)

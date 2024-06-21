@@ -1,6 +1,6 @@
 # Pendulum
 
-[Document](https://www.gymlibrary.dev/environments/classic_control/pendulum/)
+[Document](https://gymnasium.farama.org/environments/classic_control/pendulum/)
 
 ![img](../images/Pendulum.gif)
 
@@ -12,7 +12,7 @@
 
 ![alt text](../images/Pendulum_description.png)
 
-`x-y` : 길이
+`x-y` : 막대기 끝의 좌표
 
 `theta` : 라디안 각도
 
