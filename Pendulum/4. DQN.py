@@ -132,6 +132,7 @@ agent = DQNAgent(state_dim, action_dim, lr, gamma, epsilon, epsilon_decay, min_e
 for episode in range(episodes):
     state, _ = env.reset()
     total_reward = 0
+    train_socre = []
     done = False
 
     while not done:
@@ -145,6 +146,7 @@ for episode in range(episodes):
         total_reward += reward
 
     agent.decay_epsilon()
+    train_socre.append(total_reward)
 
     if episode % update_target_frequency == 0:
         agent.update_target_network()
@@ -153,3 +155,6 @@ for episode in range(episodes):
 
 # 학습된 모델 저장
 torch.save(agent.q_network.state_dict(), 'Pendulum/save_model/dqn_pendulum.pth')
+
+# 학습된 score 저장
+np.savetxt('Pendulum/score_log/pendulum_score_DQN.txt', train_socre)
