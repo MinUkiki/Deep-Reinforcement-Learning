@@ -103,7 +103,7 @@ class DQNAgent:
         self.optimizer.step()
 
     def decay_epsilon(self):
-        """탐색 비율을 감소시킵니다."""
+        # 탐색 비율을 감소
         self.epsilon = max(self.min_epsilon, self.epsilon * self.epsilon_decay)
 
 
@@ -152,4 +152,4 @@ for episode in range(episodes):
     print(f"Episode {episode + 1}, Total Reward: {total_reward}, Epsilon: {agent.epsilon}")
 
 # 학습된 모델 저장
-torch.save(agent.q_network.state_dict(), 'dqn_pendulum.pth')
+torch.save(agent.q_network.state_dict(), 'Pendulum/save_model/dqn_pendulum.pth')
