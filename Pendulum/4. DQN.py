@@ -62,10 +62,10 @@ class DQNAgent:
             with torch.no_grad():
                 action_values = self.q_network(state)
             # 가장 높은 Q 값을 가지는 행동 선택
-            torch.argmax(action_values).item()
+            action = torch.argmax(action_values).item()
         # Action을 [-2, 2] 범위로 변환
         change_action = -2 + (action / (self.action_dim -1)) * 4
-        return change_action
+        return change_action, action
 
     def remember(self, state, action, reward, next_state, done):
         # 경험을 리플레이 버퍼에 저장
@@ -135,8 +135,8 @@ for episode in range(episodes):
     done = False
 
     while not done:
-        action = agent.get_action(state)
-        next_state, reward, terminated, truncated, _ = env.step([action])
+        change_action, action = agent.get_action(state)
+        next_state, reward, terminated, truncated, _ = env.step([change_action])
         if terminated==True or truncated==True:
             done = True
         agent.remember(state, action, reward, next_state, done)
