@@ -32,7 +32,7 @@ ndarray (3,)
 
 ### reward
 
-r = -($theta^2$ + 0.1 * $theta$_$dt^2$ + 0.001 * $torque^2$)
+![alt text](../images/Pendulum_reward.png)
 
 $theta$는 [-pi, pi] 사이에서 정규화된 각도 ( 0은 수직 )
 
