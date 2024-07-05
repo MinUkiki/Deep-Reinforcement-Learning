@@ -1,7 +1,7 @@
 import numpy as np
 import gymnasium as gym
 
-render = True
+render = False
 file_path = 'Pendulum/save_model/Qlearning_Q_table.npy'
 
 if render:
