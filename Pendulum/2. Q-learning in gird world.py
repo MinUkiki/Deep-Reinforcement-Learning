@@ -16,7 +16,7 @@ velocity_num = 17
 action_num = 11
 
 angle_bins = [-3.14, -2.74, -2.35, -1.96, -1.57,
-            -1.17, -0.78, -0.39,  0.,  0.39, 0.78,
+            -1.17, -0.78, -0.39,  0., 0.39, 0.78,
             1.17,  1.57,  1.96,  2.35, 2.74,  3.14]
 velocity_bins = [-8., -7., -6., -5., -4., -3., -2., -1.,  0.,  1.,  2.,  3.,  4., 5.,  6.,  7.,  8.]
 action_bins = [-2. , -1.6, -1.2, -0.8, -0.4,  0. ,  0.4,  0.8,  1.2,  1.6,  2. ]
@@ -37,10 +37,10 @@ def policy(angle, velocity):
         action = np.argmax(q_table[angle, velocity])
     return action_bins[action]
 
-episodes = 1000
+episodes = 50000
 gamma = 0.99
 alpha = 0.1
-epsilon = 0.9
+epsilon = 0.1
 q_table = np.zeros((angle_num, velocity_num, action_num))
 
 # 학습 결과 추적을 위한 변수
@@ -75,5 +75,7 @@ for episode in range(episodes):
 print("Training completed")
 print(f"Average reward over last 100 episodes: {np.mean(total_rewards[-100:])}")
 
-# save Q-table
+# Q-table 저장
 np.save(file_path, q_table)
+
+env.close

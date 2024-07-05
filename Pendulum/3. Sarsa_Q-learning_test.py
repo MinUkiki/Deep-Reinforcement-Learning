@@ -1,8 +1,9 @@
 import numpy as np
 import gymnasium as gym
 
-render = False
-file_path = 'Pendulum/save_model/Saras_Q_table.npy'
+render = True  # 테스트 시에는 렌더링을 켜서 시각적으로 확인
+# file_path = 'Pendulum/save_model/Saras_Q_table.npy'
+file_path = 'Pendulum/save_model/Qlearning_Q_table.npy'
 
 if render:
     env = gym.make('Pendulum-v1', render_mode="human")
@@ -10,7 +11,6 @@ else:
     env = gym.make('Pendulum-v1')
 
 # Q-table을 사용하기 위해 연속적인 state, action을 이산화
-
 angle_num = 17
 velocity_num = 17
 action_num = 11
@@ -30,20 +30,14 @@ def discrete_state(state):
 def discrete_action(action):
     return np.digitize(np.array(action), action_bins) - 1
 
-def policy(angle, velocity):
-    if np.random.rand() < epsilon:
-        action = np.random.choice(range(action_num))
-    else:
-        action = np.argmax(q_table[angle, velocity])
+def policy(angle, velocity, q_table):
+    action = np.argmax(q_table[angle, velocity])
     return action_bins[action]
 
-episodes = 50000
-gamma = 0.99
-alpha = 0.1
-epsilon = 0.1
-q_table = np.zeros((angle_num, velocity_num, action_num))
+# 학습된 Q-테이블 로드
+q_table = np.load(file_path)
 
-# 학습 결과 추적을 위한 변수
+episodes = 10  # 테스트 에피소드 수
 total_rewards = []
 
 for episode in range(episodes):
@@ -51,33 +45,21 @@ for episode in range(episodes):
     truncated = False
     state, _ = env.reset()
     angle, velocity = discrete_state(state)
-    action = policy(angle, velocity)
     episode_reward = 0
 
     while not terminated and not truncated:
+        action = policy(angle, velocity, q_table)
         next_state, reward, terminated, truncated, _ = env.step([action])
         next_angle, next_velocity = discrete_state(next_state)
-        next_action = policy(next_angle, next_velocity)
 
-        dis_action = discrete_action(action)
-        dis_next_action = discrete_action(next_action)
-
-        q_target = reward + gamma * q_table[next_angle, next_velocity, dis_next_action]
-        q_table[angle, velocity, dis_action] += alpha * (q_target - q_table[angle, velocity, dis_action])
-
-        angle, velocity, action = next_angle, next_velocity, next_action
+        angle, velocity = next_angle, next_velocity
         episode_reward += reward
 
     total_rewards.append(episode_reward)
+    print(f"Episode {episode + 1}, Total Reward: {episode_reward}")
 
-    if (episode + 1) % 100 == 0:
-        print(f"Episode {episode + 1}, Total Reward: {episode_reward}")
-
-# 전체 학습 결과 출력
-print("Training completed")
-print(f"Average reward over last 100 episodes: {np.mean(total_rewards[-100:])}")
-
-# Q-table 저장
-np.save(file_path, q_table)
+# 전체 테스트 결과 출력
+print("Testing completed")
+print(f"Average reward over {episodes} episodes: {np.mean(total_rewards)}")
 
 env.close
