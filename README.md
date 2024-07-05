@@ -14,3 +14,4 @@ use gymnasium
 ## Pendulum
 1. Sarsa
 2. Q-learning
+3. DQN

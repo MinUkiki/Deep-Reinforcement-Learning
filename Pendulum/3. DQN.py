@@ -91,8 +91,8 @@ class DQNAgent:
         q_values = self.q_network(states).gather(1, actions)
         
         # 다음 상태에 대한 타겟 Q 값 계산
-        next_q_values = self.target_network(next_states).max(1)[0].unsqueeze(1)
-        target_q_values = rewards + (self.gamma * next_q_values * (1 - dones))
+        q_hat_values = self.target_network(next_states).max(1)[0].unsqueeze(1)
+        target_q_values = rewards + (self.gamma * q_hat_values * (1 - dones))
 
         # 손실 함수 계산 (평균 제곱 오차)
         loss = nn.MSELoss()(q_values, target_q_values)
@@ -106,7 +106,6 @@ class DQNAgent:
         # 탐색 비율을 감소
         self.epsilon = max(self.min_epsilon, self.epsilon * self.epsilon_decay)
 
-
 # Hyperparameters
 episodes = 500
 lr = 0.01 # 0.001
@@ -117,6 +116,7 @@ min_epsilon = 0.001
 buffer_size = 100000
 batch_size = 200 # 64
 update_target_frequency = 10
+train_socre = []
 
 # Device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -132,7 +132,6 @@ agent = DQNAgent(state_dim, action_dim, lr, gamma, epsilon, epsilon_decay, min_e
 for episode in range(episodes):
     state, _ = env.reset()
     total_reward = 0
-    train_socre = []
     done = False
 
     while not done:
