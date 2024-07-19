@@ -15,7 +15,6 @@ class GridWorld:
     def __init__(self, height_size=height_size, width_size=width_size):
         self.height_size = height_size
         self.width_size = width_size
-        self.reset()
         self.action_space = [0, 1, 2, 3] # 상 하 좌 우
         self.state_space = [(i, j) for i in range(height_size) for j in range(width_size)]
         self.goal_state = (height_size-1, width_size-1)
@@ -26,11 +25,11 @@ class GridWorld:
     
     def step(self, action):
         x, y = self.state
-        if action == 0 and x > 0:  # 상
+        if action == 0 and x > 0:                       # 상
             x -= 1
         elif action == 1 and x < self.height_size - 1:  # 하
             x += 1
-        elif action == 2 and y > 0:  # 좌
+        elif action == 2 and y > 0:                     # 좌
             y -= 1
         elif action == 3 and y < self.width_size - 1:  # 우
             y += 1
@@ -53,8 +52,10 @@ class MonteCarloAgent:
         self.env = env
         self.gamma = gamma
         self.epsilon = epsilon
-        self.q_table = np.zeros((env.height_size,env.width_size,len(env.action_space))) # 액션 가치 함수
-        self.returns = defaultdict(list) # MC Prediction
+         # 액션 가치 함수
+        self.q_table = np.zeros((env.height_size,env.width_size,len(env.action_space)))
+        # MC Prediction
+        self.returns = defaultdict(list) 
         self.constant_epsilon = self.epsilon
     # (a)
     def generate_episode(self, policy):
@@ -67,7 +68,7 @@ class MonteCarloAgent:
             episode.append((state, action, reward))
             state = next_state
         return episode
-    
+    # (b)
     def update_q_function(self, episode, alpha):
         visited_states = set()
         G = 0
@@ -86,7 +87,7 @@ class MonteCarloAgent:
                 self.q_table[x,y,action] = np.mean(self.returns[state])
             if decrease_epsilon:
                 self.epsilon -= self.constant_epsilon/episodes
-                
+    # (c)            
     def policy(self, state):
         x,y = state
         if random.random() < self.epsilon:
@@ -109,6 +110,7 @@ agent.train(episodes=episodes)
 for state in agent.env.state_space:
     print(f"State {state}: {agent.q_table[state]}")
 
+# (c)
 def get_policy(Q):
     policy = np.zeros((height_size, width_size), dtype=int)
     for i in range(height_size):

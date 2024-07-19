@@ -42,7 +42,7 @@ class DQNAgent:
         # Adam 옵티마이저로 Q 네트워크의 파라미터를 최적화
         self.optimizer = optim.Adam(self.q_network.parameters(), lr=lr)
         
-        # 경험을 저장할 deque 초기화
+        # 경험을 저장할 buffer 초기화
         self.memory = deque(maxlen=buffer_size)
         
         # 타겟 네트워크를 Q 네트워크의 가중치로 초기화

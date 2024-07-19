@@ -59,14 +59,14 @@ def policy_evaluation(policy, gamma, theta, max_iterations):
     return V
 
 def policy_improvement(V, gamma):
-    policy = {}
+    new_policy = {}
     for i in range(grid_height):
         for j in range(grid_width):
             state = (i, j)
-            policy[state] = {}
+            new_policy[state] = {}
             if state in goal_positions:
                 for a in actions:
-                    policy[state][a] = 1.0
+                    new_policy[state][a] = 1.0
             else:
                 action_values = {}
                 for action in actions:
@@ -76,20 +76,21 @@ def policy_improvement(V, gamma):
                 best_action = max(action_values, key=action_values.get)
                 for a in actions:
                     if a == best_action:
-                        policy[state][a] = 1.0
+                        new_policy[state][a] = 1.0
                     else:
-                        policy[state][a] = 0.0
-    return policy
+                        new_policy[state][a] = 0.0
+    return new_policy
 
-def policy_iteration(gamma=0.9, theta=1e-4, max_iterations=1000):
+def policy_iteration(gamma=0.9, epsilon=1e-4, max_iterations=1000):
     policy = {}
     for i in range(grid_height):
         for j in range(grid_width):
-            policy[(i, j)] = {a: 0.25 for a in actions}  # 초기 정책: 모든 행동에 동일 확률
+            # 초기 정책: 모든 행동에 동일 확률
+            policy[(i, j)] = {a: 0.25 for a in actions}  
 
     stable_policy = False
     while not stable_policy:
-        V = policy_evaluation(policy, gamma, theta, max_iterations)
+        V = policy_evaluation(policy, gamma, epsilon, max_iterations)
         new_policy = policy_improvement(V, gamma)
 
         stable_policy = True
