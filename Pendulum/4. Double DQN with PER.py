@@ -2,12 +2,12 @@ import gymnasium as gym
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import numpy as np
-from collections import deque
 import random
+import numpy as np
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+# Q 네트워크 정의
 class QNetwork(nn.Module):
     def __init__(self, state_dim, action_dim):
         super(QNetwork, self).__init__()
@@ -20,11 +20,12 @@ class QNetwork(nn.Module):
         x = torch.relu(self.fc2(x))
         return self.fc3(x)
 
+# SumTree 클래스 정의
 class SumTree:
     def __init__(self, capacity):
         self.capacity = capacity
-        self.tree = np.zeros(2 * capacity - 1)
-        self.data = np.zeros(capacity, dtype=object)
+        self.tree = torch.zeros(2 * capacity - 1)  # torch 사용
+        self.data = [None] * capacity
         self.size = 0
         self.write = 0
 
@@ -50,6 +51,8 @@ class SumTree:
     def add(self, p, data):
         idx = self.write + self.capacity - 1
         self.data[self.write] = data
+        if data == None:
+            print('None')
         self.update(idx, p)
         self.write += 1
         if self.write >= self.capacity:
@@ -67,11 +70,12 @@ class SumTree:
         data_idx = idx - self.capacity + 1
         return (idx, self.tree[idx], self.data[data_idx])
 
+# Memory 클래스 정의
 class Memory:
     def __init__(self, capacity, alpha):
         self.tree = SumTree(capacity)
         self.alpha = alpha
-        self.e = 0.01
+        self.e = 0.01  # 작은 상수로, 오류가 0이 되지 않도록 방지
 
     def _get_priority(self, error):
         return (error + self.e) ** self.alpha
@@ -82,7 +86,7 @@ class Memory:
 
     def sample(self, n):
         batch = []
-        segment = self.tree.total() / n
+        segment = self.tree.total().item() / n
         priorities = []
         indices = []
         for i in range(n):
@@ -97,6 +101,7 @@ class Memory:
         p = self._get_priority(error)
         self.tree.update(idx, p)
 
+# DQNAgent 클래스 정의
 class DQNAgent:
     def __init__(self, state_dim, action_dim, lr, gamma, epsilon, epsilon_decay, min_epsilon, buffer_size, batch_size, alpha, beta):
         self.state_dim = state_dim
@@ -112,10 +117,12 @@ class DQNAgent:
         self.beta = beta
         self.beta_increment = 0.001
 
+        # Q 네트워크와 타겟 네트워크 초기화
         self.q_network = QNetwork(state_dim, action_dim).to(device)
         self.target_network = QNetwork(state_dim, action_dim).to(device)
         self.optimizer = optim.Adam(self.q_network.parameters(), lr=lr)
-        
+
+        # Prioritized Experience Replay 메모리 초기화
         self.memory = Memory(buffer_size, alpha)
         
         self.update_target_network()
@@ -140,32 +147,42 @@ class DQNAgent:
         with torch.no_grad():
             target = reward + self.gamma * self.target_network(next_state).max(1)[0] * (1 - done)
             current = self.q_network(state).gather(1, torch.tensor([[action]]).to(device)).squeeze(1)
-            error = abs(target - current).cpu().data.numpy()
-        self.memory.add(error, (state.cpu().numpy(), action, reward, next_state.cpu().numpy(), done))
+            error = torch.abs(target - current).item()  # numpy 사용하지 않고 error 계산
+        self.memory.add(error, (state.cpu(), action, reward, next_state.cpu(), done))
 
     def replay(self):
-        if len(self.memory.tree.data) < self.batch_size:
+        if self.memory.tree.size < self.batch_size:
             return
 
         batch, idxs, priorities = self.memory.sample(self.batch_size)
         states, actions, rewards, next_states, dones = zip(*batch)
 
-        states = torch.FloatTensor(states).squeeze(1).to(device)
-        actions = torch.LongTensor(actions).unsqueeze(1).to(device)
+        # 텐서의 차원을 맞추기 위해 torch.stack 사용
+        states = torch.stack(states).to(device).squeeze(1)
+        actions = torch.LongTensor(actions).to(device).unsqueeze(1)
         rewards = torch.FloatTensor(rewards).unsqueeze(1).to(device)
-        next_states = torch.FloatTensor(next_states).squeeze(1).to(device)
+        next_states = torch.stack(next_states).to(device).squeeze(1)
         dones = torch.FloatTensor(dones).unsqueeze(1).to(device)
 
-        q_values = self.q_network(states).gather(1, actions)
-        next_action = self.q_network(next_states).max(1)[1].unsqueeze(1)
-        q_hat_values = self.target_network(next_states).gather(1, next_action).detach()
-        target_q_values = rewards + (self.gamma * q_hat_values * (1 - dones))
-
-        # Importance 샘플링 가중치 계산
+        # Compute w_i (importance sampling weight)
         priorities = torch.FloatTensor(priorities).to(device)
         sampling_probabilities = priorities / self.memory.tree.total()
         is_weight = torch.pow(len(self.memory.tree.data) * sampling_probabilities, -self.beta)
         is_weight /= is_weight.max()
+
+        # Compute TD error (δ_i) and update priorities
+        q_values = self.q_network(states).gather(1, actions)
+
+        # Double DQN: Q 네트워크에서 행동 선택, 타겟 네트워크에서 Q 값 추출
+        next_actions = self.q_network(next_states).max(1)[1].unsqueeze(1)
+        q_hat_values = self.target_network(next_states).gather(1, next_actions).detach()
+        target_q_values = rewards + (self.gamma * q_hat_values * (1 - dones))
+
+        # TD 오류 계산 및 우선순위 업데이트
+        td_errors = torch.abs(target_q_values - q_values).squeeze(1).detach()  # TD 오류 계산
+        for i in range(len(batch)):
+            idx = idxs[i]
+            self.memory.update(idx, td_errors[i].item())  # 우선순위 업데이트
 
         loss = (is_weight * (q_values - target_q_values) ** 2).mean()
 
@@ -173,20 +190,10 @@ class DQNAgent:
         loss.backward()
         self.optimizer.step()
 
-        for i in range(len(batch)):
-            state, action, reward, next_state, done = batch[i]
-            state = torch.FloatTensor(state).unsqueeze(0).to(device)
-            next_state = torch.FloatTensor(next_state).unsqueeze(0).to(device)
-            with torch.no_grad():
-                target = reward + self.gamma * self.target_network(next_state).max(1)[0] * (1 - done)
-                current = self.q_network(state).gather(1, torch.tensor([[action]]).to(device)).squeeze(1)
-                error = abs(target - current).cpu().data.numpy()
-            self.memory.update(idxs[i], error)
-
     def decay_epsilon(self):
         self.epsilon = max(self.min_epsilon, self.epsilon * self.epsilon_decay)
 
-# Hyperparameters
+# 하이퍼파라미터
 episodes = 500
 lr = 0.01
 gamma = 0.98
@@ -199,10 +206,12 @@ update_target_frequency = 10
 alpha = 0.6
 beta = 0.4
 
+# 환경 설정
 env = gym.make('Pendulum-v1')
 state_dim = env.observation_space.shape[0]
 action_dim = env.action_space.shape[0] * 11
 
+# 에이전트 생성
 agent = DQNAgent(state_dim, action_dim, lr, gamma, epsilon, epsilon_decay, min_epsilon, buffer_size, batch_size, alpha, beta)
 
 for episode in range(episodes):
@@ -226,5 +235,5 @@ for episode in range(episodes):
 
     print(f"Episode {episode + 1}, Total Reward: {total_reward}, Epsilon: {agent.epsilon}")
 
-# Save the trained model
+# 학습된 모델 저장
 torch.save(agent.q_network.state_dict(), 'dqn_pendulum.pth')

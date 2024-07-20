@@ -137,8 +137,7 @@ for episode in range(episodes):
     while not done:
         change_action, action = agent.get_action(state)
         next_state, reward, terminated, truncated, _ = env.step([change_action])
-        if terminated==True or truncated==True:
-            done = True
+        done = terminated or truncated
         agent.remember(state, action, reward, next_state, done)
         agent.replay()
         state = next_state
