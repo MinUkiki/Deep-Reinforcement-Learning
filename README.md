@@ -15,3 +15,8 @@ use gymnasium
 1. Sarsa
 2. Q-learning
 3. DQN
+4. DQN with PER
+5. REINFORCE
+6. Actor-Critic
+7. DDPG
+8. PPO
