@@ -1,239 +1,166 @@
-import gymnasium as gym
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import random
-import numpy as np
+import os
+import gymnasium as gym
+from collections import deque
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+ACTION_SPACE_SIZE = 11
+model_dir = "saved_model"
 
-# Q 네트워크 정의
+# Pendulum 환경 설정
+env = gym.make('Pendulum-v1')
+
+# 디렉토리가 없으면 생성
+if not os.path.exists(model_dir):
+    os.makedirs(model_dir)
+
+action_space = np.linspace(-2.0, 2.0, ACTION_SPACE_SIZE)
+
+# Q-네트워크 정의
 class QNetwork(nn.Module):
     def __init__(self, state_dim, action_dim):
         super(QNetwork, self).__init__()
-        self.fc1 = nn.Linear(state_dim, 64)
-        self.fc2 = nn.Linear(64, 32)
-        self.fc3 = nn.Linear(32, action_dim)
+        self.fc1 = nn.Linear(state_dim, 128)
+        self.fc2 = nn.Linear(128, 128)
+        self.fc3 = nn.Linear(128, action_dim)
 
     def forward(self, x):
         x = torch.relu(self.fc1(x))
         x = torch.relu(self.fc2(x))
         return self.fc3(x)
 
-# SumTree 클래스 정의
-class SumTree:
-    def __init__(self, capacity):
-        self.capacity = capacity
-        self.tree = torch.zeros(2 * capacity - 1)  # torch 사용
-        self.data = [None] * capacity
-        self.size = 0
-        self.write = 0
-
-    def _propagate(self, idx, change):
-        parent = (idx - 1) // 2
-        self.tree[parent] += change
-        if parent != 0:
-            self._propagate(parent, change)
-
-    def _retrieve(self, idx, s):
-        left = 2 * idx + 1
-        right = left + 1
-        if left >= len(self.tree):
-            return idx
-        if s <= self.tree[left]:
-            return self._retrieve(left, s)
-        else:
-            return self._retrieve(right, s - self.tree[left])
-
-    def total(self):
-        return self.tree[0]
-
-    def add(self, p, data):
-        idx = self.write + self.capacity - 1
-        self.data[self.write] = data
-        if data == None:
-            print('None')
-        self.update(idx, p)
-        self.write += 1
-        if self.write >= self.capacity:
-            self.write = 0
-        if self.size < self.capacity:
-            self.size += 1
-
-    def update(self, idx, p):
-        change = p - self.tree[idx]
-        self.tree[idx] = p
-        self._propagate(idx, change)
-
-    def get(self, s):
-        idx = self._retrieve(0, s)
-        data_idx = idx - self.capacity + 1
-        return (idx, self.tree[idx], self.data[data_idx])
-
-# Memory 클래스 정의
-class Memory:
+# Prioritized Replay Buffer 정의
+class PrioritizedReplayBuffer:
     def __init__(self, capacity, alpha):
-        self.tree = SumTree(capacity)
+        self.capacity = capacity
         self.alpha = alpha
-        self.e = 0.01  # 작은 상수로, 오류가 0이 되지 않도록 방지
+        self.buffer = deque(maxlen=capacity)
+        self.priorities = deque(maxlen=capacity)
 
-    def _get_priority(self, error):
-        return (error + self.e) ** self.alpha
+    def add(self, transition, td_error):
+        max_priority = max(self.priorities, default=1.0)
+        self.buffer.append(tuple(map(np.array, transition)))  # 모든 요소를 numpy array로 변환
+        self.priorities.append((abs(td_error) + PRIORITY_EPSILON) ** self.alpha)
 
-    def add(self, error, sample):
-        p = self._get_priority(error)
-        self.tree.add(p, sample)
+    def sample(self, batch_size, beta):
+        probabilities = np.array(self.priorities) / sum(self.priorities)
+        indices = np.random.choice(len(self.buffer), batch_size, p=probabilities)
+        samples = [self.buffer[idx] for idx in indices]
+        weights = (len(self.buffer) * probabilities[indices]) ** (-beta)
+        weights /= weights.max()
+        return samples, indices, weights
 
-    def sample(self, n):
-        batch = []
-        segment = self.tree.total().item() / n
-        priorities = []
-        indices = []
-        for i in range(n):
-            s = random.uniform(segment * i, segment * (i + 1))
-            (idx, p, data) = self.tree.get(s)
-            batch.append(data)
-            priorities.append(p)
-            indices.append(idx)
-        return batch, indices, priorities
+    def update_priorities(self, indices, td_errors):
+        for idx, td_error in zip(indices, td_errors):
+            self.priorities[idx] = (abs(td_error) + PRIORITY_EPSILON) ** self.alpha
 
-    def update(self, idx, error):
-        p = self._get_priority(error)
-        self.tree.update(idx, p)
-
-# DQNAgent 클래스 정의
-class DQNAgent:
-    def __init__(self, state_dim, action_dim, lr, gamma, epsilon, epsilon_decay, min_epsilon, buffer_size, batch_size, alpha, beta):
-        self.state_dim = state_dim
+# Double DQN 에이전트 정의
+class DoubleDQNAgent:
+    def __init__(self, state_dim, action_dim):
         self.action_dim = action_dim
-        self.lr = lr
-        self.gamma = gamma
-        self.epsilon = epsilon
-        self.epsilon_decay = epsilon_decay
-        self.min_epsilon = min_epsilon
-        self.buffer_size = buffer_size
-        self.batch_size = batch_size
-        self.alpha = alpha
-        self.beta = beta
-        self.beta_increment = 0.001
-
-        # Q 네트워크와 타겟 네트워크 초기화
-        self.q_network = QNetwork(state_dim, action_dim).to(device)
-        self.target_network = QNetwork(state_dim, action_dim).to(device)
-        self.optimizer = optim.Adam(self.q_network.parameters(), lr=lr)
-
-        # Prioritized Experience Replay 메모리 초기화
-        self.memory = Memory(buffer_size, alpha)
-        
-        self.update_target_network()
-
-    def update_target_network(self):
+        self.q_network = QNetwork(state_dim, action_dim)
+        self.target_network = QNetwork(state_dim, action_dim)
         self.target_network.load_state_dict(self.q_network.state_dict())
+        self.optimizer = optim.Adam(self.q_network.parameters(), lr=LEARNING_RATE)
+        self.replay_buffer = PrioritizedReplayBuffer(REPLAY_MEMORY_SIZE, ALPHA)
+        self.beta = BETA_START
+        self.frame_idx = 0
 
-    def get_action(self, state):
-        if np.random.rand() < self.epsilon:
-            action = random.randrange(self.action_dim)
-        else:
-            state = torch.FloatTensor(state).unsqueeze(0).to(device)
+    def select_action(self, state):
+        if random.random() > epsilon:
             with torch.no_grad():
-                action_values = self.q_network(state)
-            action = torch.argmax(action_values).item()
-        change_action = -2 + (action / (self.action_dim - 1)) * 4
-        return change_action, action
+                q_values = self.q_network(torch.tensor(state, dtype=torch.float32))
+                action_idx = q_values.argmax().item()
+        else:
+            action_idx = random.randint(0, self.action_dim - 1)
+        return action_idx
 
-    def remember(self, state, action, reward, next_state, done):
-        state = torch.FloatTensor(state).unsqueeze(0).to(device)
-        next_state = torch.FloatTensor(next_state).unsqueeze(0).to(device)
-        with torch.no_grad():
-            target = reward + self.gamma * self.target_network(next_state).max(1)[0] * (1 - done)
-            current = self.q_network(state).gather(1, torch.tensor([[action]]).to(device)).squeeze(1)
-            error = torch.abs(target - current).item()  # numpy 사용하지 않고 error 계산
-        self.memory.add(error, (state.cpu(), action, reward, next_state.cpu(), done))
-
-    def replay(self):
-        if self.memory.tree.size < self.batch_size:
+    def update(self):
+        if len(self.replay_buffer.buffer) < BATCH_SIZE:
             return
 
-        batch, idxs, priorities = self.memory.sample(self.batch_size)
-        states, actions, rewards, next_states, dones = zip(*batch)
+        transitions, indices, weights = self.replay_buffer.sample(BATCH_SIZE, self.beta)
+        batch = np.array(transitions, dtype=object)
+        states = torch.tensor(np.vstack(batch[:, 0]), dtype=torch.float32)
+        actions = torch.tensor(batch[:, 1].astype(np.int64), dtype=torch.long)  # action을 int64로 변환
+        rewards = torch.tensor(batch[:, 2].astype(np.float32), dtype=torch.float32)
+        next_states = torch.tensor(np.vstack(batch[:, 3]), dtype=torch.float32)
+        dones = torch.tensor(batch[:, 4].astype(np.float32), dtype=torch.float32)
 
-        # 텐서의 차원을 맞추기 위해 torch.stack 사용
-        states = torch.stack(states).to(device).squeeze(1)
-        actions = torch.LongTensor(actions).to(device).unsqueeze(1)
-        rewards = torch.FloatTensor(rewards).unsqueeze(1).to(device)
-        next_states = torch.stack(next_states).to(device).squeeze(1)
-        dones = torch.FloatTensor(dones).unsqueeze(1).to(device)
+        q_values = self.q_network(states).gather(1, actions.unsqueeze(-1)).squeeze(-1)
+        next_q_values = self.target_network(next_states).detach()
+        next_actions = self.q_network(next_states).argmax(1).detach()
+        next_q_value = next_q_values.gather(1, next_actions.unsqueeze(-1)).squeeze(-1)
+        target = rewards + (1 - dones) * GAMMA * next_q_value
 
-        # Compute w_i (importance sampling weight)
-        priorities = torch.FloatTensor(priorities).to(device)
-        sampling_probabilities = priorities / self.memory.tree.total()
-        is_weight = torch.pow(len(self.memory.tree.data) * sampling_probabilities, -self.beta)
-        is_weight /= is_weight.max()
-
-        # Compute TD error (δ_i) and update priorities
-        q_values = self.q_network(states).gather(1, actions)
-
-        # Double DQN: Q 네트워크에서 행동 선택, 타겟 네트워크에서 Q 값 추출
-        next_actions = self.q_network(next_states).max(1)[1].unsqueeze(1)
-        q_hat_values = self.target_network(next_states).gather(1, next_actions).detach()
-        target_q_values = rewards + (self.gamma * q_hat_values * (1 - dones))
-
-        # TD 오류 계산 및 우선순위 업데이트
-        td_errors = torch.abs(target_q_values - q_values).squeeze(1).detach()  # TD 오류 계산
-        for i in range(len(batch)):
-            idx = idxs[i]
-            self.memory.update(idx, td_errors[i].item())  # 우선순위 업데이트
-
-        loss = (is_weight * (q_values - target_q_values) ** 2).mean()
+        td_errors = q_values - target
+        loss = (torch.tensor(weights, dtype=torch.float32) * td_errors.pow(2)).mean()
 
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
 
-    def decay_epsilon(self):
-        self.epsilon = max(self.min_epsilon, self.epsilon * self.epsilon_decay)
+        self.replay_buffer.update_priorities(indices, td_errors.detach().numpy())
 
-# 하이퍼파라미터
-episodes = 500
-lr = 0.01
-gamma = 0.98
+        if self.frame_idx % TARGET_UPDATE_FREQ == 0:
+            self.target_network.load_state_dict(self.q_network.state_dict())
+
+        self.frame_idx += 1
+
+# Hyperparameters
+BATCH_SIZE = 64
+REPLAY_MEMORY_SIZE = 100000
+GAMMA = 0.99
+ALPHA = 0.6
+BETA_START = 0.4
+BETA_FRAMES = 100000
+PRIORITY_EPSILON = 1e-6
+LEARNING_RATE = 1e-3
+TARGET_UPDATE_FREQ = 1000
+
+# 에이전트 학습
+agent = DoubleDQNAgent(state_dim=env.observation_space.shape[0], action_dim=ACTION_SPACE_SIZE)
 epsilon = 1.0
-epsilon_decay = 0.98
-min_epsilon = 0.001
-buffer_size = 100000
-batch_size = 64
-update_target_frequency = 10
-alpha = 0.6
-beta = 0.4
+epsilon_decay = 0.995
+min_epsilon = 0.01
+num_episodes = 250
+print_interval = 10  # 에피소드마다 평균 점수를 출력할 간격
+score = 0.0
 
-# 환경 설정
-env = gym.make('Pendulum-v1')
-state_dim = env.observation_space.shape[0]
-action_dim = env.action_space.shape[0] * 11
-
-# 에이전트 생성
-agent = DQNAgent(state_dim, action_dim, lr, gamma, epsilon, epsilon_decay, min_epsilon, buffer_size, batch_size, alpha, beta)
-
-for episode in range(episodes):
+for episode in range(num_episodes):
     state, _ = env.reset()
-    total_reward = 0
     done = False
+    total_reward = 0
 
     while not done:
-        change_action, action = agent.get_action(state)
-        next_state, reward, terminated, truncated, _ = env.step([change_action])
+        action_idx = agent.select_action(state)
+        action = np.array([action_space[action_idx]])
+        next_state, reward, terminated, truncated, _ = env.step(action)
         done = terminated or truncated
-        agent.remember(state, action, reward, next_state, done)
-        agent.replay()
+
+        # 우선순위 리플레이 버퍼에 추가
+        target = reward + GAMMA * np.max(agent.q_network(torch.tensor(np.array([next_state]), dtype=torch.float32)).detach().numpy())
+        current = np.max(agent.q_network(torch.tensor(np.array([state]), dtype=torch.float32)).detach().numpy())
+        td_error = target - current
+        agent.replay_buffer.add((state, action_idx, reward, next_state, done), td_error)
+
+        agent.update()
+
         state = next_state
         total_reward += reward
 
-    agent.decay_epsilon()
+    score += total_reward
+    epsilon = max(min_epsilon, epsilon * epsilon_decay)
 
-    if episode % update_target_frequency == 0:
-        agent.update_target_network()
+    if episode % print_interval == 0 and episode != 0:
+        avg_score = score / print_interval
+        print(f"# of episode : {episode}, avg score : {avg_score:.1f}")
+        score = 0.0
 
-    print(f"Episode {episode + 1}, Total Reward: {total_reward}, Epsilon: {agent.epsilon}")
+# 학습이 완료된 후 최종 모델 저장
+torch.save(agent.q_network.state_dict(), f"{model_dir}/q_network_final_weights.pth")
 
-# 학습된 모델 저장
-torch.save(agent.q_network.state_dict(), 'dqn_pendulum.pth')
+env.close()

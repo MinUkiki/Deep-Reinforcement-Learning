@@ -1,125 +1,119 @@
 import gymnasium as gym
+import os
+import numpy as np
 import torch
 import torch.nn as nn
-import torch.optim as optim
-import numpy as np
 import torch.nn.functional as F
+import torch.optim as optim
+from torch.distributions import Normal
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# 하이퍼파라미터 설정
+learning_rate = 0.0003
+gamma = 0.98
+model_dir = "saved_model"
 
-class PolicyNetwork(nn.Module):
+# 디렉토리가 없으면 생성
+if not os.path.exists(model_dir):
+    os.makedirs(model_dir)
+
+class Policy(nn.Module):
     def __init__(self, state_dim, action_dim):
-        super(PolicyNetwork, self).__init__()
-        self.fc1 = nn.Linear(state_dim, 64)
-        self.fc2 = nn.Linear(64, 32)
-        self.fc_mu = nn.Linear(32, action_dim)
-        self.fc_log_std = nn.Linear(32, action_dim)
-    
-    def forward(self, x):
-        x = torch.relu(self.fc1(x))
-        x = torch.relu(self.fc2(x))
-        mu = 2.0 * torch.tanh(self.fc_mu(x))         # 평균 값
-        std = F.softplus(self.fc_log_std(x))                    # 표준편차
-        return mu, std
+        super(Policy, self).__init__()
+        self.data = []
 
-class ValueNetwork(nn.Module):
-    def __init__(self, state_dim):
-        super(ValueNetwork, self).__init__()
-        self.fc1 = nn.Linear(state_dim, 64)
-        self.fc2 = nn.Linear(64, 32)
-        self.fc3 = nn.Linear(32, 1)
+        self.fc1 = nn.Linear(state_dim, 128)  # Pendulum 환경의 상태 공간 크기는 3
+        self.fc_mean = nn.Linear(128, action_dim)  # 액션의 평균값
+        self.fc_std = nn.Linear(128, action_dim)   # 액션의 표준편차
+        self.optimizer = optim.Adam(self.parameters(), lr=learning_rate)
 
     def forward(self, x):
-        x = torch.relu(self.fc1(x))
-        x = torch.relu(self.fc2(x))
-        return self.fc3(x)
+        x = F.relu(self.fc1(x))
+        mean = torch.tanh(self.fc_mean(x)) * 2.0  # Pendulum의 액션 범위는 [-2, 2]
+        std = F.softplus(self.fc_std(x))  # 표준편차는 항상 양수여야 하므로 softplus 사용
+        return mean, std
 
-class REINFORCEAgent:
-    def __init__(self, state_dim, action_dim, lr_policy, lr_value, gamma):
-        self.policy_network = PolicyNetwork(state_dim, action_dim).to(device)
-        self.value_network = ValueNetwork(state_dim).to(device)
-        self.optimizer_policy = optim.Adam(self.policy_network.parameters(), lr=lr_policy)
-        self.optimizer_value = optim.Adam(self.value_network.parameters(), lr=lr_value)
-        self.gamma = gamma
-        self.memory = []
+    def put_data(self, item):
+        self.data.append(item)
 
-    def get_action(self, state):
-        state = torch.FloatTensor(state).unsqueeze(0).to(device)
-        mu, std = self.policy_network(state)
-        dist = torch.distributions.Normal(mu, std)
-        action = dist.sample()
-        log_prob = dist.log_prob(action)
-        return action.item(), log_prob
-
-    def remember(self, log_prob, value, reward):
-        self.memory.append((log_prob, value, reward))
-
-    def update(self):
+    def train_net(self, critic):
         R = 0
-        policy_loss = []
-        value_loss = []
-        returns = []
+        self.optimizer.zero_grad()
+        for r, prob, state in self.data[::-1]:
+            R = r + gamma * R
+            value = critic(state)
+            td_error = R - value.item()
+            loss = -prob * td_error
+            loss.backward()
+        self.optimizer.step()
+        self.data = []
 
-        for log_prob, value, reward in reversed(self.memory):
-            R = reward + self.gamma * R
-            returns.insert(0, R)
+class Critic(nn.Module):
+    def __init__(self, state_dim, action_dim):
+        super(Critic, self).__init__()
+        self.fc1 = nn.Linear(state_dim, 128)
+        self.fc2 = nn.Linear(128, action_dim)
+        self.optimizer = optim.Adam(self.parameters(), lr=learning_rate)
 
-        returns = torch.tensor(returns).to(device)
-        returns = (returns - returns.mean()) / (returns.std() + 1e-5)
+    def forward(self, x):
+        x = F.relu(self.fc1(x))
+        value = self.fc2(x)
+        return value
 
-        for (log_prob, value, reward), R in zip(self.memory, returns):
-            advantage = R - value.item()
-            policy_loss.append(-log_prob * advantage)
-            value_loss.append(nn.MSELoss()(value, torch.tensor([R]).to(device)))
+    def train_net(self, data):
+        R = 0
+        loss_list = []
+        self.optimizer.zero_grad()
+        for r, _, state in data[::-1]:
+            R = r + gamma * R
+            value = self.forward(state)
+            loss = F.mse_loss(value, torch.tensor([[R]], dtype=torch.float32))
+            loss_list.append(loss)
+        loss = torch.stack(loss_list).mean()
+        loss.backward()
+        self.optimizer.step()
 
-        self.optimizer_policy.zero_grad()
-        policy_loss = torch.cat(policy_loss).sum()
-        policy_loss.backward()
-        self.optimizer_policy.step()
+def main():
+    env = gym.make('Pendulum-v1') 
+    state_dim = env.observation_space.shape[0]
+    action_dim = env.action_space.shape[0]
+    policy = Policy(state_dim,action_dim)
+    critic = Critic(state_dim,action_dim)
+    score = 0.0
+    print_interval = 20
 
-        self.optimizer_value.zero_grad()
-        value_loss = torch.stack(value_loss).sum()
-        value_loss.backward()
-        self.optimizer_value.step()
+    for n_epi in range(5000):
+        s, _ = env.reset()
+        done = False
 
-        self.memory = []
+        while not done:
+            mean, std = policy(torch.from_numpy(s).float())
+            dist = Normal(mean, std)
+            a = dist.sample()
+            a = torch.clamp(a, -2.0, 2.0)  # Pendulum의 액션 범위 [-2, 2]로 클램핑
+            s_prime, r, terminated, truncated, _ = env.step(np.array([a.item()], dtype=np.float32))
+            done = terminated or truncated
+            policy.put_data((r, dist.log_prob(a), torch.from_numpy(s).float()))
+            s = s_prime
+            score += r
 
-# 하이퍼파라미터
-episodes = 5000
-lr_policy = 0.001
-lr_value = 0.001
-gamma = 0.99
-train_score = []
+        # Critic 네트워크 학습
+        critic.train_net(policy.data)
+        # Policy 네트워크 학습 (Baseline 사용)
+        policy.train_net(critic)
 
-# 환경 설정
-env = gym.make('Pendulum-v1')
-state_dim = env.observation_space.shape[0]
-action_dim = env.action_space.shape[0]
+        if n_epi % print_interval == 0 and n_epi != 0:
+            print("# of episode :{}, avg score : {:.1f}".format(n_epi, score / print_interval))
+            score = 0.0
+            
+    #         # 모델 저장
+    #         torch.save(policy.state_dict(), f"{model_dir}/policy_{n_epi}.pth")
+    #         torch.save(critic.state_dict(), f"{model_dir}/critic_{n_epi}.pth")
 
-# 에이전트 생성
-agent = REINFORCEAgent(state_dim, action_dim, lr_policy, lr_value, gamma)
+    # 최종 모델 저장
+    torch.save(policy.state_dict(), f"{model_dir}/reinforce_policy_final.pth")
+    torch.save(critic.state_dict(), f"{model_dir}/reinforce_critic_final.pth")
 
-for episode in range(episodes):
-    state, _ = env.reset()
-    total_reward = 0
-    done = False
+    env.close()
 
-    while not done:
-        action, log_prob = agent.get_action(state)
-        next_state, reward, terminated, truncated, _ = env.step([2.0*action]) # [-2,2]
-        done = terminated or truncated
-        value = agent.value_network(torch.FloatTensor(state).unsqueeze(0).to(device))
-        agent.remember(log_prob, value, reward)
-        state = next_state
-        total_reward += reward
-
-    agent.update()
-    train_score.append(total_reward)
-    print(f"Episode {episode + 1}, Total Reward: {total_reward}")
-
-# 학습된 모델 저장
-torch.save(agent.policy_network.state_dict(), 'Pendulum/save_model/reinforce_policy.pth')
-torch.save(agent.value_network.state_dict(), 'Pendulum/save_model/reinforce_value.pth')
-
-# 학습된 score 저장
-np.savetxt('Pendulum/score_log/pendulum_score_REINFORCE.txt', train_score)
+if __name__ == '__main__':
+    main()
