@@ -39,7 +39,7 @@ num_test_episodes = 10
 total_rewards = []
 
 # 파일 열기 (쓰기 모드)
-with open("test_rewards.txt", "w") as file:
+with open("test_dqn.txt", "w") as file:
     for episode in range(num_test_episodes):
         state, _ = env.reset()
         done = False
