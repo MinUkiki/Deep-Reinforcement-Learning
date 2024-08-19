@@ -29,7 +29,7 @@ state_dim = env.observation_space.shape[0]
 action_dim = env.action_space.shape[0]
 
 policy_net = Policy(state_dim, action_dim)
-policy_net.load_state_dict(torch.load('saved_models\policy_final.pth'))
+policy_net.load_state_dict(torch.load('Pendulum\save_model\reinforce_policy_final.pth'))
 policy_net.eval()  # 평가 모드로 전환
 
 num_test_episodes = 10

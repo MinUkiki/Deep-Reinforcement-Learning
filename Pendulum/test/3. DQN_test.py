@@ -23,7 +23,7 @@ action_dim = 11
 q_network = QNetwork(state_dim, action_dim)
 
 # 모델 불러오기
-q_network.load_state_dict(torch.load('q_network_final_weights.pth'))
+q_network.load_state_dict(torch.load('Pendulum\save_model\q_network_final_weights.pth'))
 q_network.eval()
 
 # 이산적 액션 공간을 연속적 액션 공간으로 변환하는 함수
