@@ -1,7 +1,18 @@
 # Deep Reinforcement Learning
 
+python==3.11.9
+
+```
+pip install -r requirements.txt
+```
+
 use gymnasium
 [download](https://minukiki.github.io/ai/OpenaiGym/)
+
+If you are using Anaconda env (recommended requirements)
+```
+conda env create -f environment.yml
+```
 
 ## Grid world
 
