@@ -1,14 +1,15 @@
 import numpy as np
-import gymnasium as gym
+# import gymnasium as gym # 다른 환경을 사용할 때
+from pendulum import PendulumEnv
 
 render = True  # 테스트 시에는 렌더링을 켜서 시각적으로 확인
 # file_path = 'Pendulum/save_model/Saras_Q_table.npy'
 file_path = 'Pendulum/save_model/Qlearning_Q_table.npy'
 
 if render:
-    env = gym.make('Pendulum-v1', render_mode="human")
+    env = PendulumEnv(render_mode="human")
 else:
-    env = gym.make('Pendulum-v1')
+    env = PendulumEnv()
 
 # Q-table을 사용하기 위해 연속적인 state, action을 이산화
 angle_num = 17

@@ -1,4 +1,4 @@
-import gymnasium as gym
+# import gymnasium as gym # 다른 환경을 사용할 때
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -6,6 +6,7 @@ import torch.optim as optim
 import os
 import numpy as np
 from torch.distributions import Normal
+from pendulum import PendulumEnv
 
 # Hyperparameters
 learning_rate = 0.0002
@@ -81,7 +82,8 @@ class ActorCritic(nn.Module):
         I *= gamma
 
 def main():
-    env = gym.make('Pendulum-v1')
+    # env = gym.make('Pendulum-v1')
+    env = PendulumEnv()
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.shape[0]
     model = ActorCritic(state_dim, action_dim)

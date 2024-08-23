@@ -1,10 +1,11 @@
-import gymnasium as gym
+# import gymnasium as gym # 다른 환경을 사용할 때
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 from collections import deque
 import random
+from pendulum import PendulumEnv
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -122,7 +123,8 @@ train_socre = []
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Environment
-env = gym.make('Pendulum-v1')
+# env = gym.make('Pendulum-v1')
+env = PendulumEnv()
 state_dim = env.observation_space.shape[0]
 action_dim = env.action_space.shape[0] * 11
 

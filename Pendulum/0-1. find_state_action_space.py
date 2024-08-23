@@ -1,5 +1,4 @@
 import numpy as np
-import gymnasium as gym
 
 angle_num_bins = 17
 velocity_num_bins = 17

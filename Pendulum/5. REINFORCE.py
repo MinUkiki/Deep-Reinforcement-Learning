@@ -1,4 +1,4 @@
-import gymnasium as gym
+# import gymnasium as gym # 다른 환경을 사용할 때
 import os
 import numpy as np
 import torch
@@ -6,6 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.distributions import Normal
+from pendulum import PendulumEnv
 
 # 하이퍼파라미터 설정
 learning_rate = 0.0003
@@ -73,7 +74,8 @@ class Critic(nn.Module):
         self.optimizer.step()
 
 def main():
-    env = gym.make('Pendulum-v1') 
+    # env = gym.make('Pendulum-v1')
+    env = PendulumEnv() 
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.shape[0]
     policy = Policy(state_dim,action_dim)

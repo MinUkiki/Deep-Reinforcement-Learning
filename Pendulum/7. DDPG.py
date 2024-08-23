@@ -1,4 +1,4 @@
-import gymnasium as gym
+# import gymnasium as gym # 다른 환경을 사용할 때
 import random
 import os
 import collections
@@ -7,6 +7,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from pendulum import PendulumEnv
 
 # 하이퍼파라미터
 lr_mu = 0.0005
@@ -116,7 +117,8 @@ def soft_update(net, net_target):
 
 # 메인 함수
 def main():
-    env = gym.make('Pendulum-v1')
+    # env = gym.make('Pendulum-v1')
+    env = PendulumEnv()
     memory = ReplayBuffer()
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.shape[0]

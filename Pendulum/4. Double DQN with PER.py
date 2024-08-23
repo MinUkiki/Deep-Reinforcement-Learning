@@ -4,14 +4,16 @@ import torch.nn as nn
 import torch.optim as optim
 import random
 import os
-import gymnasium as gym
+# import gymnasium as gym # 다른 환경을 사용할 때
 from collections import deque
+from pendulum import PendulumEnv
 
 ACTION_SPACE_SIZE = 11
 model_dir = "saved_model"
 
 # Pendulum 환경 설정
-env = gym.make('Pendulum-v1')
+# env = gym.make('Pendulum-v1')
+env = PendulumEnv()
 
 # 디렉토리가 없으면 생성
 if not os.path.exists(model_dir):
