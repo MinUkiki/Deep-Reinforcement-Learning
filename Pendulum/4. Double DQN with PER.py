@@ -9,7 +9,7 @@ from collections import deque
 from pendulum import PendulumEnv
 
 ACTION_SPACE_SIZE = 11
-model_dir = "saved_model"
+model_dir = "Pendulum\saved_model"
 
 # Pendulum 환경 설정
 # env = gym.make('Pendulum-v1')
@@ -163,6 +163,6 @@ for episode in range(num_episodes):
         score = 0.0
 
 # 학습이 완료된 후 최종 모델 저장
-torch.save(agent.q_network.state_dict(), f"{model_dir}/q_network_final_weights.pth")
+torch.save(agent.q_network.state_dict(), f"{model_dir}/double_dqn_pendulum.pth")
 
 env.close()

@@ -19,7 +19,7 @@ target_entropy = -1.0
 init_alpha = 0.01
 batch_size = 32
 buffer_limit = 50000
-model_dir = "saved_model"
+model_dir = "Pendulum\saved_model"
 
 # 디렉토리가 없으면 생성
 if not os.path.exists(model_dir):
@@ -103,7 +103,7 @@ class Critic(nn.Module):
         self.fc_s = nn.Linear(state_dim, 64)
         self.fc_a = nn.Linear(action_dim,64)
         self.fc_cat = nn.Linear(128,32)
-        self.fc_out = nn.Linear(32,action_dim)
+        self.fc_out = nn.Linear(32,1)
         self.optimizer = optim.Adam(self.parameters(), lr=critic_learning_rate)
 
     def forward(self, x, a):
@@ -155,7 +155,7 @@ def main():
     score = 0.0
     print_interval = 20
 
-    for n_epi in range(1000):
+    for n_epi in range(1500):
         s, _ = env.reset()
         done = False
         count = 0
@@ -185,13 +185,13 @@ def main():
 
         if n_epi % 100 == 0 and n_epi != 0:
             torch.save(actor.state_dict(), f"{model_dir}/{n_epi}_sac_actor.pth")
-            torch.save(q1.state_dict(), f"{model_dir}/{n_epi}_sac_critic.pth")
-            torch.save(q2.state_dict(), f"{model_dir}/{n_epi}_sac_critic.pth")
+            torch.save(q1.state_dict(), f"{model_dir}/{n_epi}_sac_critic1.pth")
+            torch.save(q2.state_dict(), f"{model_dir}/{n_epi}_sac_critic2.pth")
 
     # 최종 모델 저장
-    torch.save(actor.state_dict(), f"{model_dir}/sac_actor_final.pth")
-    torch.save(q1.state_dict(), f"{model_dir}/sac_critic_final.pth")
-    torch.save(q2.state_dict(), f"{model_dir}/sac_critic_final.pth")
+    torch.save(actor.state_dict(), f"{model_dir}/sac_actor_pendulum.pth")
+    torch.save(q1.state_dict(), f"{model_dir}/sac_critic1_pendulum.pth")
+    torch.save(q2.state_dict(), f"{model_dir}/sac_critic2_pendulum.pth")
     env.close()
 
 if __name__ == '__main__':

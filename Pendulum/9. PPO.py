@@ -17,7 +17,7 @@ K_epoch = 10
 rollout_len = 3
 buffer_size = 10
 minibatch_size = 32
-model_dir = "saved_model"
+model_dir = "Pendulum\saved_model"
 
 # 디렉토리가 없으면 생성
 if not os.path.exists(model_dir):
@@ -155,7 +155,7 @@ def main():
     env = PendulumEnv()
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.shape[0]
-    model = PPO(state_dim, action_dim)
+    agent = PPO(state_dim, action_dim)
     score = 0.0
     print_interval = 20
     rollout = []
@@ -166,7 +166,7 @@ def main():
         count = 0
         while count < 200 and not done:
             for t in range(rollout_len):
-                mu, std = model.actor(torch.from_numpy(s).float())
+                mu, std = agent.actor(torch.from_numpy(s).float())
                 dist = Normal(mu, std)
                 a = dist.sample()
                 log_prob = dist.log_prob(a)
@@ -175,22 +175,26 @@ def main():
 
                 rollout.append((s, a, r/10.0, s_prime, log_prob.item(), done))
                 if len(rollout) == rollout_len:
-                    model.put_data(rollout)
+                    agent.put_data(rollout)
                     rollout = []
 
                 s = s_prime
                 score += r
                 count += 1
 
-            model.train_net()
+            agent.train_net()
 
         if n_epi % print_interval == 0 and n_epi != 0:
-            print("# of episode :{}, avg score : {:.1f}, optmization step: {}".format(n_epi, score/print_interval, model.optimization_step))
+            print(f"# of episode :{n_epi}, avg score : {score / print_interval:.1f}")
             score = 0.0
 
+        if n_epi % 100 == 0 and n_epi != 0:
+            torch.save(agent.actor.state_dict(), f"{model_dir}/{n_epi}_ppo_actor.pth")
+            torch.save(agent.critic.state_dict(), f"{model_dir}/{n_epi}_ppo_critic.pth")
+
     # 최종 모델 저장
-    torch.save(model.actor.state_dict(), f"{model_dir}/1ppo_actor_final.pth")
-    torch.save(model.critic.state_dict(), f"{model_dir}/1ppo_critic_final.pth")
+    torch.save(agent.actor.state_dict(), f"{model_dir}/ppo_actor_pendulum.pth")
+    torch.save(agent.critic.state_dict(), f"{model_dir}/ppo_critic_pendulum.pth")
     env.close()
 
 if __name__ == '__main__':

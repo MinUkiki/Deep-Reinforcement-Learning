@@ -1,4 +1,3 @@
-import gymnasium as gym # 다른 환경을 사용할 때
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -9,10 +8,11 @@ from torch.distributions import Normal
 from pendulum import PendulumEnv
 
 # Hyperparameters
-actor_learning_rate = 0.0003
+actor_learning_rate = 0.0002
 critic_learning_rate = 0.001
 gamma = 0.98
 n_rollout = 10
+target_update_interval = 10  # Target network 업데이트 주기
 model_dir = "Pendulum\saved_model"
 
 # 디렉토리가 없으면 생성
@@ -44,13 +44,19 @@ class Critic(nn.Module):
         v = self.fc_v(x)
         return v
 
-class A2CAgent:
+class ActorCriticAgent:
     def __init__(self, state_dim, action_dim):
         self.actor = Actor(state_dim, action_dim)
         self.critic = Critic(state_dim)
+        self.target_critic = Critic(state_dim)
         self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=actor_learning_rate)
         self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=critic_learning_rate)
+        self.update_target_network()
         self.data = []
+
+    def update_target_network(self):
+        """Target Critic 네트워크를 Critic 네트워크의 가중치로 업데이트"""
+        self.target_critic.load_state_dict(self.critic.state_dict())
 
     def put_data(self, transition):
         self.data.append(transition)
@@ -74,33 +80,36 @@ class A2CAgent:
         self.data = []
         return s_batch, a_batch, r_batch, s_prime_batch, done_batch
 
-    def train_net(self):
+    def train_net(self, n_epi):
         s, a, r, s_prime, done = self.make_batch()
-        td_target = r + gamma * self.critic(s_prime) * done
-        delta = td_target - self.critic(s)
-
-        mu, std = self.actor(s)
-        dist = Normal(mu, std)
-        log_prob = dist.log_prob(a)
-        actor_loss = -log_prob * delta.detach()
+        td_target = r + gamma * self.target_critic(s_prime) * done  # Target Network를 사용하여 TD Target 계산
         critic_loss = F.smooth_l1_loss(self.critic(s), td_target.detach())
-
-        # Actor 업데이트
-        self.actor_optimizer.zero_grad()
-        actor_loss.mean().backward()
-        self.actor_optimizer.step()
 
         # Critic 업데이트
         self.critic_optimizer.zero_grad()
         critic_loss.backward()
         self.critic_optimizer.step()
 
+        # Actor 업데이트
+        mu, std = self.actor(s)
+        dist = Normal(mu, std)
+        log_prob = dist.log_prob(a)
+        actor_loss = -log_prob * (td_target - self.critic(s)).detach()
+
+        self.actor_optimizer.zero_grad()
+        actor_loss.mean().backward()
+        self.actor_optimizer.step()
+
+        # 일정 주기마다 Target Critic 네트워크 업데이트
+        if n_epi % target_update_interval == 0:
+            self.update_target_network()
+
 def main():
     # env = gym.make('Pendulum-v1')
     env = PendulumEnv()
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.shape[0]
-    agent = A2CAgent(state_dim, action_dim)
+    agent = ActorCriticAgent(state_dim, action_dim)
     print_interval = 20
     score = 0.0
 
@@ -123,20 +132,20 @@ def main():
                 if done:
                     break
 
-            agent.train_net()
+            agent.train_net(n_epi)
 
         if n_epi % print_interval == 0 and n_epi != 0:
-            print(f"# of episode :{n_epi}, avg score : {score / print_interval:.1f}")
+            print("# of episode :{}, avg score : {:.1f}".format(n_epi, score / print_interval))
             score = 0.0
 
         # 후반에 학습이 안되는 경우
         if n_epi % 100 == 0 and n_epi != 0:
-            torch.save(agent.actor.state_dict(), f"{model_dir}/{n_epi}_a2c_actor.pth")
-            torch.save(agent.critic.state_dict(), f"{model_dir}/{n_epi}_a2c_critic.pth")
+            torch.save(agent.actor.state_dict(), f"{model_dir}/{n_epi}_actor_withTarget.pth")
+            torch.save(agent.critic.state_dict(), f"{model_dir}/{n_epi}_critic_withTarget.pth")
 
     # 최종 모델 저장
-    torch.save(agent.actor.state_dict(), f"{model_dir}/a2c_actor_pendulum.pth")
-    torch.save(agent.critic.state_dict(), f"{model_dir}/a2c_critic_pendulum.pth")
+    torch.save(agent.actor.state_dict(), f"{model_dir}/actor_withTarget_pendulum.pth")
+    torch.save(agent.critic.state_dict(), f"{model_dir}/critic_withTarget_pendulum.pth")
     env.close()
 
 if __name__ == '__main__':

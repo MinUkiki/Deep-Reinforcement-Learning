@@ -11,7 +11,7 @@ from pendulum import PendulumEnv
 # 하이퍼파라미터 설정
 learning_rate = 0.0003
 gamma = 0.98
-model_dir = "saved_model"
+model_dir = "Pendulum\saved_model"
 
 # 디렉토리가 없으면 생성
 if not os.path.exists(model_dir):
@@ -52,7 +52,7 @@ class Critic(nn.Module):
     def __init__(self, state_dim, action_dim):
         super(Critic, self).__init__()
         self.fc1 = nn.Linear(state_dim, 128)
-        self.fc2 = nn.Linear(128, action_dim)
+        self.fc2 = nn.Linear(128, 1)
         self.optimizer = optim.Adam(self.parameters(), lr=learning_rate)
 
     def forward(self, x):
@@ -104,16 +104,16 @@ def main():
         policy.train_net(critic)
 
         if n_epi % print_interval == 0 and n_epi != 0:
-            print("# of episode :{}, avg score : {:.1f}".format(n_epi, score / print_interval))
+            print(f"# of episode :{n_epi}, avg score : {score / print_interval:.1f}")
             score = 0.0
             
     #         # 모델 저장
-    #         torch.save(policy.state_dict(), f"{model_dir}/policy_{n_epi}.pth")
-    #         torch.save(critic.state_dict(), f"{model_dir}/critic_{n_epi}.pth")
+    #         torch.save(policy.state_dict(), f"{model_dir}/{n_epi}_policy.pth")
+    #         torch.save(critic.state_dict(), f"{model_dir}/{n_epi}_critic.pth")
 
     # 최종 모델 저장
-    torch.save(policy.state_dict(), f"{model_dir}/1reinforce_policy_final.pth")
-    torch.save(critic.state_dict(), f"{model_dir}/1reinforce_critic_final.pth")
+    torch.save(policy.state_dict(), f"{model_dir}/reinforce_policy_pendulum.pth")
+    torch.save(critic.state_dict(), f"{model_dir}/reinforce_critic_pendulum.pth")
 
     env.close()
 

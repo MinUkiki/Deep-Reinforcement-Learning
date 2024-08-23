@@ -32,7 +32,7 @@ for idx, results in enumerate(all_results):
 plt.title("Comparison of Models", fontsize=16)
 plt.xlabel("Test Episode", fontsize=14)
 plt.ylabel("Total Reward", fontsize=14)
-plt.ylim(-2000, 0)
+plt.ylim(-1600, 0)
 plt.legend(fontsize=12)
 # plt.grid(True, linestyle='--', alpha=0.7)
 plt.grid(False)

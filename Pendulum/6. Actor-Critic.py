@@ -13,7 +13,7 @@ actor_learning_rate = 0.0003
 critic_learning_rate = 0.001
 gamma = 0.98
 n_rollout = 10
-model_dir = "saved_model"
+model_dir = "Pendulum\saved_model"
 
 # 디렉토리가 없으면 생성
 if not os.path.exists(model_dir):
@@ -131,12 +131,12 @@ def main():
             score = 0.0
 
         if n_epi % 100 == 0 and n_epi != 0:
-            torch.save(agent.actor.state_dict(), f"{model_dir}/{n_epi}_1actor_final.pth")
-            torch.save(agent.critic.state_dict(), f"{model_dir}/{n_epi}_1critic_final.pth")
+            torch.save(agent.actor.state_dict(), f"{model_dir}/{n_epi}_actor.pth")
+            torch.save(agent.critic.state_dict(), f"{model_dir}/{n_epi}_critic.pth")
 
     # 최종 모델 저장
-    torch.save(agent.actor.state_dict(), f"{model_dir}/actor_final.pth")
-    torch.save(agent.critic.state_dict(), f"{model_dir}/critic_final.pth")
+    torch.save(agent.actor.state_dict(), f"{model_dir}/actor_pendulum.pth")
+    torch.save(agent.critic.state_dict(), f"{model_dir}/critic_pendulum.pth")
     env.close()
 
 if __name__ == '__main__':
