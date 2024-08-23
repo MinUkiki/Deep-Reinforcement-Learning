@@ -44,7 +44,7 @@ class Critic(nn.Module):
         v = self.fc_v(x)
         return v
 
-class ActorCriticAgent:
+class A2CAgent:
     def __init__(self, state_dim, action_dim):
         self.actor = Actor(state_dim, action_dim)
         self.critic = Critic(state_dim)
@@ -61,16 +61,16 @@ class ActorCriticAgent:
             s, a, r, s_prime, done = transition
             s_lst.append(s)
             a_lst.append([a])
-            r_lst.append([(r + 8) / 8])
+            r_lst.append([(r + 8) / 8])  # 리워드 스케일링
             s_prime_lst.append(s_prime)
             done_mask = 0.0 if done else 1.0
             done_lst.append([done_mask])
 
-        s_batch = torch.tensor(s_lst, dtype=torch.float32)
-        a_batch = torch.tensor(a_lst, dtype=torch.float32)
-        r_batch = torch.tensor(r_lst, dtype=torch.float32)
-        s_prime_batch = torch.tensor(s_prime_lst, dtype=torch.float32)
-        done_batch = torch.tensor(done_lst, dtype=torch.float32)
+        s_batch = torch.tensor(s_lst, dtype=torch.float)
+        a_batch = torch.tensor(a_lst, dtype=torch.float)
+        r_batch = torch.tensor(r_lst, dtype=torch.float)
+        s_prime_batch = torch.tensor(s_prime_lst, dtype=torch.float)
+        done_batch = torch.tensor(done_lst, dtype=torch.float)
         self.data = []
         return s_batch, a_batch, r_batch, s_prime_batch, done_batch
 
@@ -79,19 +79,18 @@ class ActorCriticAgent:
         td_target = r + gamma * self.critic(s_prime) * done
         delta = td_target - self.critic(s)
 
-        # Actor 업데이트
         mu, std = self.actor(s)
         dist = Normal(mu, std)
         log_prob = dist.log_prob(a)
         actor_loss = -log_prob * delta.detach()
+        critic_loss = F.smooth_l1_loss(self.critic(s), td_target.detach())
 
+        # Actor 업데이트
         self.actor_optimizer.zero_grad()
         actor_loss.mean().backward()
         self.actor_optimizer.step()
 
         # Critic 업데이트
-        critic_loss = F.smooth_l1_loss(self.critic(s), td_target.detach())
-
         self.critic_optimizer.zero_grad()
         critic_loss.backward()
         self.critic_optimizer.step()
@@ -101,7 +100,7 @@ def main():
     env = PendulumEnv()
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.shape[0]
-    agent = ActorCriticAgent(state_dim, action_dim)
+    agent = A2CAgent(state_dim, action_dim)
     print_interval = 20
     score = 0.0
 
@@ -127,16 +126,17 @@ def main():
             agent.train_net()
 
         if n_epi % print_interval == 0 and n_epi != 0:
-            print(f"# of episode :{n_epi}, avg score : {score / print_interval:.1f}")
+            print("# of episode :{}, avg score : {:.1f}".format(n_epi, score / print_interval))
             score = 0.0
 
+        # 후반에 학습이 안되는 경우
         if n_epi % 100 == 0 and n_epi != 0:
-            torch.save(agent.actor.state_dict(), f"{model_dir}/{n_epi}_1actor_final.pth")
-            torch.save(agent.critic.state_dict(), f"{model_dir}/{n_epi}_1critic_final.pth")
+            torch.save(agent.actor.state_dict(), f"{model_dir}/{n_epi}_actor_final.pth")
+            torch.save(agent.critic.state_dict(), f"{model_dir}/{n_epi}_critic_final.pth")
 
     # 최종 모델 저장
-    torch.save(agent.actor.state_dict(), f"{model_dir}/actor_final.pth")
-    torch.save(agent.critic.state_dict(), f"{model_dir}/critic_final.pth")
+    torch.save(agent.actor.state_dict(), f"{model_dir}/a2c_actor_final.pth")
+    torch.save(agent.critic.state_dict(), f"{model_dir}/a2c_critic_final.pth")
     env.close()
 
 if __name__ == '__main__':

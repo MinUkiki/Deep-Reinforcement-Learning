@@ -1,5 +1,5 @@
 import numpy as np
-# import gymnasium as gym # 다른 환경을 사용할 때
+import gymnasium as gym # 다른 환경을 사용할 때
 from pendulum import PendulumEnv
 
 render = False

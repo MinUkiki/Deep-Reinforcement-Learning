@@ -1,4 +1,4 @@
-# import gymnasium as gym # 다른 환경을 사용할 때
+import gymnasium as gym # 다른 환경을 사용할 때
 import os
 import numpy as np
 import torch
@@ -112,8 +112,8 @@ def main():
     #         torch.save(critic.state_dict(), f"{model_dir}/critic_{n_epi}.pth")
 
     # 최종 모델 저장
-    torch.save(policy.state_dict(), f"{model_dir}/reinforce_policy_final.pth")
-    torch.save(critic.state_dict(), f"{model_dir}/reinforce_critic_final.pth")
+    torch.save(policy.state_dict(), f"{model_dir}/1reinforce_policy_final.pth")
+    torch.save(critic.state_dict(), f"{model_dir}/1reinforce_critic_final.pth")
 
     env.close()
 

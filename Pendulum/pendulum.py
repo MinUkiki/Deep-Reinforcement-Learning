@@ -27,8 +27,6 @@ class PendulumEnv(gym.Env):
     The diagram below specifies the coordinate system used for the implementation of the pendulum's
     dynamic equations.
 
-    ![Pendulum Coordinate System](/_static/diagrams/pendulum.png)
-
     - `x-y`: cartesian coordinates of the pendulum's end in meters.
     - `theta` : angle in radians.
     - `tau`: torque in `N m`. Defined as positive _counter-clockwise_.
@@ -69,31 +67,13 @@ class PendulumEnv(gym.Env):
 
     ## Episode Truncation
 
-    The episode truncates at 200 time steps.
+    The episode truncates at 200 time steps by default.
 
     ## Arguments
 
-    - `g`: .
+    - `g`: Gravity constant.
+    - `max_episode_steps`: Maximum number of steps per episode.
 
-    Pendulum has two parameters for `gymnasium.make` with `render_mode` and `g` representing
-    the acceleration of gravity measured in *(m s<sup>-2</sup>)* used to calculate the pendulum dynamics.
-    The default value is `g = 10.0`.
-    On reset, the `options` parameter allows the user to change the bounds used to determine the new random state.
-
-    ```python
-    >>> import gymnasium as gym
-    >>> env = gym.make("Pendulum-v1", render_mode="rgb_array", g=9.81)  # default g=10.0
-    >>> env
-    <TimeLimit<OrderEnforcing<PassiveEnvChecker<PendulumEnv<Pendulum-v1>>>>>
-    >>> env.reset(seed=123, options={"low": -0.7, "high": 0.5})  # default low=-0.6, high=-0.5
-    (array([ 0.4123625 ,  0.91101986, -0.89235795], dtype=float32), {})
-
-    ```
-
-    ## Version History
-
-    * v1: Simplify the math equations, no difference in behavior.
-    * v0: Initial versions release
     """
 
     metadata = {
@@ -101,7 +81,7 @@ class PendulumEnv(gym.Env):
         "render_fps": 30,
     }
 
-    def __init__(self, render_mode: Optional[str] = None, g=10.0):
+    def __init__(self, render_mode: Optional[str] = None, g=10.0, max_episode_steps=200):
         self.max_speed = 8
         self.max_torque = 2.0
         self.dt = 0.05
@@ -110,6 +90,8 @@ class PendulumEnv(gym.Env):
         self.l = 1.0
 
         self.render_mode = render_mode
+        self.max_episode_steps = max_episode_steps  # 최대 스텝 수 설정
+        self.current_step = 0  # 현재 스텝 카운터
 
         self.screen_dim = 500
         self.screen = None
@@ -117,9 +99,6 @@ class PendulumEnv(gym.Env):
         self.isopen = True
 
         high = np.array([1.0, 1.0, self.max_speed], dtype=np.float32)
-        # This will throw a warning in tests/envs/test_envs in utils/env_checker.py as the space is not symmetric
-        #   or normalised as max_torque == 2 by default. Ignoring the issue here as the default settings are too old
-        #   to update to follow the gymnasium api
         self.action_space = spaces.Box(
             low=-self.max_torque, high=self.max_torque, shape=(1,), dtype=np.float32
         )
@@ -142,19 +121,20 @@ class PendulumEnv(gym.Env):
         newth = th + newthdot * dt
 
         self.state = np.array([newth, newthdot])
+        self.current_step += 1
+
+        # 현재 스텝이 최대 스텝 수에 도달하면 done을 True로 설정
+        done = self.current_step >= self.max_episode_steps
 
         if self.render_mode == "human":
             self.render()
-        # truncation=False as the time limit is handled by the `TimeLimit` wrapper added during `make`
-        return self._get_obs(), -costs, False, False, {}
+        return self._get_obs(), -costs, done, False, {}
 
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None):
         super().reset(seed=seed)
         if options is None:
             high = np.array([DEFAULT_X, DEFAULT_Y])
         else:
-            # Note that if you use custom reset bounds, it may lead to out-of-bound
-            # state/observations.
             x = options.get("x_init") if "x_init" in options else DEFAULT_X
             y = options.get("y_init") if "y_init" in options else DEFAULT_Y
             x = utils.verify_number_and_cast(x)
@@ -163,6 +143,7 @@ class PendulumEnv(gym.Env):
         low = -high  # We enforce symmetric limits.
         self.state = self.np_random.uniform(low=low, high=high)
         self.last_u = None
+        self.current_step = 0  # 에피소드 시작 시 스텝 카운터 초기화
 
         if self.render_mode == "human":
             self.render()

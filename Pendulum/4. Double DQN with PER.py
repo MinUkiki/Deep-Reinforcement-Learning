@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.optim as optim
 import random
 import os
-# import gymnasium as gym # 다른 환경을 사용할 때
+import gymnasium as gym # 다른 환경을 사용할 때
 from collections import deque
 from pendulum import PendulumEnv
 

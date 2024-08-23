@@ -1,4 +1,4 @@
-# import gymnasium as gym # 다른 환경을 사용할 때
+import gymnasium as gym # 다른 환경을 사용할 때
 import torch
 import torch.nn as nn
 import torch.optim as optim

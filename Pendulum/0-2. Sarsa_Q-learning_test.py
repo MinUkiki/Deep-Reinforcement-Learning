@@ -1,5 +1,5 @@
 import numpy as np
-# import gymnasium as gym # 다른 환경을 사용할 때
+import gymnasium as gym # 다른 환경을 사용할 때
 from pendulum import PendulumEnv
 
 render = True  # 테스트 시에는 렌더링을 켜서 시각적으로 확인

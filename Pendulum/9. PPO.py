@@ -160,7 +160,7 @@ def main():
     print_interval = 20
     rollout = []
 
-    for n_epi in range(5000):
+    for n_epi in range(1500):
         s, _ = env.reset()
         done = False
         count = 0
@@ -189,8 +189,8 @@ def main():
             score = 0.0
 
     # 최종 모델 저장
-    torch.save(model.actor.state_dict(), f"{model_dir}/ppo_actor_final.pth")
-    torch.save(model.critic.state_dict(), f"{model_dir}/ppo_critic_final.pth")
+    torch.save(model.actor.state_dict(), f"{model_dir}/1ppo_actor_final.pth")
+    torch.save(model.critic.state_dict(), f"{model_dir}/1ppo_critic_final.pth")
     env.close()
 
 if __name__ == '__main__':
