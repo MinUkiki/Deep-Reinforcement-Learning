@@ -28,8 +28,8 @@ conda env create -f environment.yml
 3. DQN
 4. DQN with PER
 5. REINFORCE
-6. Actor-Critic
-7. Actor-Critic with Target network
+6. Actor-Critic / 6-1. Actor-Critic with Target network
+7. A2C
 8. DDPG
 9. PPO
 10. SAC
