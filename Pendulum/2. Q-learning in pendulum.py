@@ -1,9 +1,14 @@
 import numpy as np
 import gymnasium as gym # 다른 환경을 사용할 때
+import os
 from pendulum import PendulumEnv
 
 render = False
-file_path = 'Pendulum/save_model/Qlearning_Q_table.npy'
+
+# 경로 설정
+current_dir = os.path.dirname(__file__)
+model_dir = os.path.join(current_dir, "saved_model")
+file_path = 'Qlearning_Q_table.npy'
 
 if render:
     env = PendulumEnv(render_mode="human")
@@ -77,6 +82,6 @@ print("Training completed")
 print(f"Average reward over last 100 episodes: {np.mean(total_rewards[-100:])}")
 
 # Q-table 저장
-np.save(file_path, q_table)
+np.save(model_dir + "/" + file_path, q_table)
 
 env.close

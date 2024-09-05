@@ -1,10 +1,14 @@
 import numpy as np
 import gymnasium as gym # 다른 환경을 사용할 때
 from pendulum import PendulumEnv
-
+import os
 render = True  # 테스트 시에는 렌더링을 켜서 시각적으로 확인
 # file_path = 'Pendulum/save_model/Saras_Q_table.npy'
-file_path = 'Pendulum/save_model/Qlearning_Q_table.npy'
+
+# 경로 설정
+current_dir = os.path.dirname(__file__)
+model_dir = os.path.join(current_dir, "saved_model")
+file_path = 'Qlearning_Q_table.npy'
 
 if render:
     env = PendulumEnv(render_mode="human")
@@ -36,7 +40,7 @@ def policy(angle, velocity, q_table):
     return action_bins[action]
 
 # 학습된 Q-테이블 로드
-q_table = np.load(file_path)
+q_table = np.load(model_dir + "/" + file_path)
 
 episodes = 10  # 테스트 에피소드 수
 total_rewards = []

@@ -6,14 +6,15 @@ import torch.nn as nn
 current_dir = os.path.dirname(__file__)
 model_dir = os.path.join(current_dir, "../saved_model")
 
+# Q-네트워크 정의
 class QNetwork(nn.Module):
     def __init__(self, state_dim, action_dim):
         super(QNetwork, self).__init__()
-        self.fc1 = nn.Linear(state_dim, 128)
-        self.fc2 = nn.Linear(128, 128)
-        self.fc3 = nn.Linear(128, 64)
-        self.fc4 = nn.Linear(64, action_dim)
-    
+        self.fc1 = nn.Linear(state_dim, 256)
+        self.fc2 = nn.Linear(256, 128)
+        self.fc3 = nn.Linear(128, 128)
+        self.fc4 = nn.Linear(128, action_dim)
+
     def forward(self, x):
         x = torch.relu(self.fc1(x))
         x = torch.relu(self.fc2(x))
@@ -28,7 +29,7 @@ action_dim = 11
 q_network = QNetwork(state_dim, action_dim)
 
 # 모델 불러오기
-q_network.load_state_dict(torch.load(f'{model_dir}\dqn_pendulum.pth')) # DQN
+q_network.load_state_dict(torch.load(f'{model_dir}\double_dqn_pendulum.pth')) # Double DQN
 q_network.eval()
 
 # 이산적 액션 공간을 연속적 액션 공간으로 변환하는 함수

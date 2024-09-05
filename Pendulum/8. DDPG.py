@@ -1,4 +1,4 @@
-import gymnasium as gym # 다른 환경을 사용할 때
+#import gymnasium as gym # 다른 환경을 사용할 때
 import random
 import os
 import collections
@@ -10,14 +10,15 @@ import torch.optim as optim
 from pendulum import PendulumEnv
 
 # 하이퍼파라미터
-lr_mu = 0.0005
+lr_mu = 0.0001
 lr_q = 0.001
 gamma = 0.99
-batch_size = 32
+batch_size = 64
 buffer_limit = 50000
 tau = 0.005  # 타겟 네트워크 소프트 업데이트를 위한 파라미터
 
-model_dir = "saved_model"
+current_dir = os.path.dirname(__file__)
+model_dir = os.path.join(current_dir, "saved_model")
 
 # 디렉토리가 없으면 생성
 if not os.path.exists(model_dir):
@@ -55,13 +56,15 @@ class ReplayBuffer():
 class MuNet(nn.Module):
     def __init__(self, state_dim, action_dim):
         super(MuNet, self).__init__()
-        self.fc1 = nn.Linear(state_dim, 128)
-        self.fc2 = nn.Linear(128, 64)
-        self.fc_mu = nn.Linear(64, action_dim)
+        self.fc1 = nn.Linear(state_dim, 256)
+        self.fc2 = nn.Linear(256, 128)
+        self.fc3 = nn.Linear(128, 128)
+        self.fc_mu = nn.Linear(128, action_dim)
 
     def forward(self, x):
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
+        x = F.relu(self.fc3(x))
         mu = torch.tanh(self.fc_mu(x)) * 2
         return mu
 
@@ -69,16 +72,18 @@ class MuNet(nn.Module):
 class QNet(nn.Module):
     def __init__(self, state_dim, action_dim):
         super(QNet, self).__init__()
-        self.fc_s = nn.Linear(state_dim, 64)
-        self.fc_a = nn.Linear(action_dim, 64)
-        self.fc_q = nn.Linear(128, 32)
-        self.fc_out = nn.Linear(32, action_dim)
+        self.fc_s = nn.Linear(state_dim, 128)
+        self.fc_a = nn.Linear(action_dim, 128)
+        self.fc_q1 = nn.Linear(256, 128)
+        self.fc_q2 = nn.Linear(128, 128)
+        self.fc_out = nn.Linear(128, action_dim)
 
     def forward(self, x, a):
         h1 = F.relu(self.fc_s(x))
         h2 = F.relu(self.fc_a(a))
         cat = torch.cat([h1, h2], dim=1)
-        q = F.relu(self.fc_q(cat))
+        q = F.relu(self.fc_q1(cat))
+        q = F.relu(self.fc_q2(q))
         q = self.fc_out(q)
         return q
 
@@ -118,6 +123,7 @@ def soft_update(net, net_target):
 # 메인 함수
 def main():
     # env = gym.make('Pendulum-v1')
+    # env = PendulumEnv(render_mode='human')
     env = PendulumEnv()
     memory = ReplayBuffer()
     state_dim = env.observation_space.shape[0]
@@ -135,7 +141,7 @@ def main():
     q_optimizer = optim.Adam(q.parameters(), lr=lr_q)
     ou_noise = OrnsteinUhlenbeckNoise(mu=np.zeros(1))
 
-    for n_epi in range(5000):
+    for n_epi in range(500):
         s, _ = env.reset()
         done = False
 
@@ -145,7 +151,7 @@ def main():
             a = a.item() + ou_noise()[0]
             s_prime, r, terminated, truncated, _  = env.step([a])
             done = terminated or truncated
-            memory.put((s, a, r / 10.0, s_prime, done))
+            memory.put((s, a, r, s_prime, done))
             score += r
             s = s_prime
             count += 1

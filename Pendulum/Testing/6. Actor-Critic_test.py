@@ -1,35 +1,39 @@
 # Actor Critic test
 import gymnasium as gym
-import torch
+import torch, os
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.optim as optim
 import numpy as np
+
+current_dir = os.path.dirname(__file__)
+model_dir = os.path.join(current_dir, "../saved_model")
 
 class Actor(nn.Module):
     def __init__(self, state_dim, action_dim):
         super(Actor, self).__init__()
         self.fc1 = nn.Linear(state_dim, 256)
-        self.fc_mu = nn.Linear(256, action_dim)  # 액션의 평균값
-        self.fc_std = nn.Linear(256, action_dim)  # 액션의 표준편차
+        self.fc2 = nn.Linear(256, 128)
+        self.fc_mu = nn.Linear(128, action_dim)  # 액션의 평균값
+        self.fc_std = nn.Linear(128, action_dim)  # 액션의 표준편차
 
     def forward(self, x):
         x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
         mu = 2.0 * torch.tanh(self.fc_mu(x))  # 액션의 범위 [-2, 2]
         std = F.softplus(self.fc_std(x))  # 표준편차는 항상 양수여야 하므로 softplus 사용
         std = torch.clamp(std, min=1e-3)
         return mu, std
 
 # 테스트 환경 설정
-env = gym.make('Pendulum-v1')
+env = gym.make('Pendulum-v1', render_mode='human')
 
 # 저장된 모델 로드
 state_dim = env.observation_space.shape[0]
 action_dim = env.action_space.shape[0]
 
 policy_net = Actor(state_dim, action_dim)
-policy_net.load_state_dict(torch.load('Pendulum/saved_model/actor_pendulum.pth'))
-policy_net.eval()  # 평가 모드로 전환
+policy_net.load_state_dict(torch.load(f'{model_dir}/actor_pendulum.pth'))
+policy_net.eval()  # 평가 모드로 전환 
 
 num_test_episodes = 10
 total_rewards = []

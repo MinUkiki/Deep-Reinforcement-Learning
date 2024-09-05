@@ -1,9 +1,12 @@
 import gymnasium as gym
-import torch
+import torch, os
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import numpy as np
+
+current_dir = os.path.dirname(__file__)
+model_dir = os.path.join(current_dir, "../saved_model")
 
 class Policy(nn.Module):
     def __init__(self, state_dim, action_dim):
@@ -22,14 +25,14 @@ class Policy(nn.Module):
         return mean, std
 
 # 테스트 환경 설정
-env = gym.make('Pendulum-v1')
+env = gym.make('Pendulum-v1', render_mode="human")
 
 # 저장된 모델 로드
 state_dim = env.observation_space.shape[0]
 action_dim = env.action_space.shape[0]
 
 policy_net = Policy(state_dim, action_dim)
-policy_net.load_state_dict(torch.load('Pendulum/saved_model/reinforce_policy_pendulum.pth'))
+policy_net.load_state_dict(torch.load(f'{model_dir}/reinforce_policy_pendulum.pth'))
 policy_net.eval()  # 평가 모드로 전환
 
 num_test_episodes = 10

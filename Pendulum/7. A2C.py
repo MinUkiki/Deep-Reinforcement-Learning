@@ -9,11 +9,12 @@ from torch.distributions import Normal
 from pendulum import PendulumEnv
 
 # Hyperparameters
-actor_learning_rate = 0.0003
-critic_learning_rate = 0.001
+actor_learning_rate = 0.00002
+critic_learning_rate = 0.0002
 gamma = 0.98
 n_rollout = 10
-model_dir = "Pendulum\saved_model"
+current_dir = os.path.dirname(__file__)
+model_dir = os.path.join(current_dir, "saved_model")
 
 # 디렉토리가 없으면 생성
 if not os.path.exists(model_dir):
@@ -23,11 +24,13 @@ class Actor(nn.Module):
     def __init__(self, state_dim, action_dim):
         super(Actor, self).__init__()
         self.fc1 = nn.Linear(state_dim, 256)
-        self.fc_mu = nn.Linear(256, action_dim)  # 액션의 평균값
-        self.fc_std = nn.Linear(256, action_dim)  # 액션의 표준편차
+        self.fc2 = nn.Linear(256, 128)
+        self.fc_mu = nn.Linear(128, action_dim)  # 액션의 평균값
+        self.fc_std = nn.Linear(128, action_dim)  # 액션의 표준편차
 
     def forward(self, x):
         x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
         mu = 2.0 * torch.tanh(self.fc_mu(x))  # 액션의 범위 [-2, 2]
         std = F.softplus(self.fc_std(x))  # 표준편차는 항상 양수여야 하므로 softplus 사용
         std = torch.clamp(std, min=1e-3)
@@ -37,10 +40,12 @@ class Critic(nn.Module):
     def __init__(self, state_dim):
         super(Critic, self).__init__()
         self.fc1 = nn.Linear(state_dim, 256)
-        self.fc_v = nn.Linear(256, 1)  # 상태 가치 함수
+        self.fc2 = nn.Linear(256, 128)
+        self.fc_v = nn.Linear(128, 1)  # 상태 가치 함수
 
     def forward(self, x):
         x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
         v = self.fc_v(x)
         return v
 
@@ -129,7 +134,6 @@ def main():
             print(f"# of episode :{n_epi}, avg score : {score / print_interval:.1f}")
             score = 0.0
 
-        # 후반에 학습이 안되는 경우
         if n_epi % 100 == 0 and n_epi != 0:
             torch.save(agent.actor.state_dict(), f"{model_dir}/{n_epi}_a2c_actor.pth")
             torch.save(agent.critic.state_dict(), f"{model_dir}/{n_epi}_a2c_critic.pth")

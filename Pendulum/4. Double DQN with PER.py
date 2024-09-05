@@ -9,7 +9,8 @@ from collections import deque
 from pendulum import PendulumEnv
 
 ACTION_SPACE_SIZE = 11
-model_dir = "Pendulum\saved_model"
+current_dir = os.path.dirname(__file__)
+model_dir = os.path.join(current_dir, "saved_model")
 
 # Pendulum 환경 설정
 # env = gym.make('Pendulum-v1')
@@ -25,14 +26,16 @@ action_space = np.linspace(-2.0, 2.0, ACTION_SPACE_SIZE)
 class QNetwork(nn.Module):
     def __init__(self, state_dim, action_dim):
         super(QNetwork, self).__init__()
-        self.fc1 = nn.Linear(state_dim, 128)
-        self.fc2 = nn.Linear(128, 128)
-        self.fc3 = nn.Linear(128, action_dim)
+        self.fc1 = nn.Linear(state_dim, 256)
+        self.fc2 = nn.Linear(256, 128)
+        self.fc3 = nn.Linear(128, 128)
+        self.fc4 = nn.Linear(128, action_dim)
 
     def forward(self, x):
         x = torch.relu(self.fc1(x))
         x = torch.relu(self.fc2(x))
-        return self.fc3(x)
+        x = torch.relu(self.fc3(x))
+        return self.fc4(x)
 
 # Prioritized Replay Buffer 정의
 class PrioritizedReplayBuffer:
@@ -99,13 +102,14 @@ class DoubleDQNAgent:
         target = rewards + (1 - dones) * GAMMA * next_q_value
 
         td_errors = q_values - target
+        
+        self.replay_buffer.update_priorities(indices, td_errors.detach().numpy())
+        
         loss = (torch.tensor(weights, dtype=torch.float32) * td_errors.pow(2)).mean()
 
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
-
-        self.replay_buffer.update_priorities(indices, td_errors.detach().numpy())
 
         if self.frame_idx % TARGET_UPDATE_FREQ == 0:
             self.target_network.load_state_dict(self.q_network.state_dict())
@@ -114,21 +118,21 @@ class DoubleDQNAgent:
 
 # Hyperparameters
 BATCH_SIZE = 64
-REPLAY_MEMORY_SIZE = 100000
+REPLAY_MEMORY_SIZE = 10000
 GAMMA = 0.99
 ALPHA = 0.6
 BETA_START = 0.4
 BETA_FRAMES = 100000
-PRIORITY_EPSILON = 1e-6
-LEARNING_RATE = 1e-3
-TARGET_UPDATE_FREQ = 1000
+PRIORITY_EPSILON = 1e-5
+LEARNING_RATE = 3e-4
+TARGET_UPDATE_FREQ = 10
 
 # 에이전트 학습
 agent = DoubleDQNAgent(state_dim=env.observation_space.shape[0], action_dim=ACTION_SPACE_SIZE)
 epsilon = 1.0
 epsilon_decay = 0.995
 min_epsilon = 0.01
-num_episodes = 250
+num_episodes = 500
 print_interval = 10  # 에피소드마다 평균 점수를 출력할 간격
 score = 0.0
 
@@ -159,7 +163,7 @@ for episode in range(num_episodes):
 
     if episode % print_interval == 0 and episode != 0:
         avg_score = score / print_interval
-        print(f"# of episode : {episode}, avg score : {avg_score:.1f}")
+        print(f"# of episode : {episode}, avg score : {avg_score:.1f}, epsilon : {epsilon}")
         score = 0.0
 
 # 학습이 완료된 후 최종 모델 저장

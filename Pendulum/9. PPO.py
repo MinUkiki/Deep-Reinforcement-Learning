@@ -16,8 +16,11 @@ eps_clip = 0.2
 K_epoch = 10
 rollout_len = 3
 buffer_size = 10
-minibatch_size = 32
-model_dir = "Pendulum\saved_model"
+minibatch_size = 128
+
+# 경로 설정
+current_dir = os.path.dirname(__file__)
+model_dir = os.path.join(current_dir, "saved_model")
 
 # 디렉토리가 없으면 생성
 if not os.path.exists(model_dir):

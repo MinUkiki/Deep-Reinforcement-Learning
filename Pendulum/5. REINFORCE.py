@@ -9,9 +9,10 @@ from torch.distributions import Normal
 from pendulum import PendulumEnv
 
 # 하이퍼파라미터 설정
-learning_rate = 0.0003
+learning_rate = 0.001
 gamma = 0.98
-model_dir = "Pendulum\saved_model"
+current_dir = os.path.dirname(__file__)
+model_dir = os.path.join(current_dir, "saved_model")
 
 # 디렉토리가 없으면 생성
 if not os.path.exists(model_dir):
@@ -23,12 +24,16 @@ class Policy(nn.Module):
         self.data = []
 
         self.fc1 = nn.Linear(state_dim, 128)  # Pendulum 환경의 상태 공간 크기는 3
-        self.fc_mean = nn.Linear(128, action_dim)  # 액션의 평균값
-        self.fc_std = nn.Linear(128, action_dim)   # 액션의 표준편차
+        self.fc2 = nn.Linear(128, 128)
+        self.fc3 = nn.Linear(128, 64)
+        self.fc_mean = nn.Linear(64, action_dim)   # 액션의 표준편차
+        self.fc_std = nn.Linear(64, action_dim)   # 액션의 표준편차
         self.optimizer = optim.Adam(self.parameters(), lr=learning_rate)
 
     def forward(self, x):
         x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = F.relu(self.fc3(x))
         mean = torch.tanh(self.fc_mean(x)) * 2.0  # Pendulum의 액션 범위는 [-2, 2]
         std = F.softplus(self.fc_std(x))  # 표준편차는 항상 양수여야 하므로 softplus 사용
         return mean, std
@@ -52,12 +57,16 @@ class Critic(nn.Module):
     def __init__(self, state_dim, action_dim):
         super(Critic, self).__init__()
         self.fc1 = nn.Linear(state_dim, 128)
-        self.fc2 = nn.Linear(128, 1)
+        self.fc2 = nn.Linear(128, 128)
+        self.fc3 = nn.Linear(128, 64)
+        self.fc4 = nn.Linear(64, 1)
         self.optimizer = optim.Adam(self.parameters(), lr=learning_rate)
 
     def forward(self, x):
         x = F.relu(self.fc1(x))
-        value = self.fc2(x)
+        x = F.relu(self.fc2(x))
+        x = F.relu(self.fc3(x))
+        value = self.fc4(x)
         return value
 
     def train_net(self, data):
@@ -83,7 +92,7 @@ def main():
     score = 0.0
     print_interval = 20
 
-    for n_epi in range(5000):
+    for n_epi in range(1500):
         s, _ = env.reset()
         done = False
 

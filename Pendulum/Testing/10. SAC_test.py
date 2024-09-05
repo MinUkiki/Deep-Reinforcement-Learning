@@ -1,10 +1,13 @@
 # SAC test
 import gymnasium as gym
-import torch
+import torch, os
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Normal
 import numpy as np
+
+current_dir = os.path.dirname(__file__)
+model_dir = os.path.join(current_dir, "../saved_model")
 
 class Actor(nn.Module):
     def __init__(self, state_dim, action_dim):
@@ -32,7 +35,7 @@ state_dim = env.observation_space.shape[0]
 action_dim = env.action_space.shape[0]
 
 policy_net = Actor(state_dim, action_dim)
-policy_net.load_state_dict(torch.load('Pendulum/saved_model/sac_actor_pendulum.pth'))
+policy_net.load_state_dict(torch.load(f'{model_dir}/sac_actor_pendulum.pth'))
 policy_net.eval()  # 평가 모드로 전환
 
 num_test_episodes = 10

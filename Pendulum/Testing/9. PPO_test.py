@@ -1,10 +1,13 @@
 # PPO test
 
 import gymnasium as gym
-import torch
+import torch, os
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
+
+current_dir = os.path.dirname(__file__)
+model_dir = os.path.join(current_dir, "../saved_model")
 
 # Actor 네트워크 정의
 class Actor(nn.Module):
@@ -29,7 +32,7 @@ action_dim = env.action_space.shape[0]
 
 # Actor 네트워크 초기화 및 모델 로드
 actor_net = Actor(state_dim, action_dim)
-actor_net.load_state_dict(torch.load('Pendulum\saved_model\ppo_actor_pendulum.pth'))
+actor_net.load_state_dict(torch.load(f'{model_dir}\ppo_actor_pendulum.pth'))
 actor_net.eval()  # 평가 모드로 전환
 
 num_test_episodes = 10

@@ -19,7 +19,8 @@ target_entropy = -1.0
 init_alpha = 0.01
 batch_size = 32
 buffer_limit = 50000
-model_dir = "Pendulum\saved_model"
+current_dir = os.path.dirname(__file__)
+model_dir = os.path.join(current_dir, "saved_model")
 
 # 디렉토리가 없으면 생성
 if not os.path.exists(model_dir):

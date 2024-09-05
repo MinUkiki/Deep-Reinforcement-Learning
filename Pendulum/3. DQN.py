@@ -4,22 +4,27 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 from collections import deque
-import random
+import random, os
 from pendulum import PendulumEnv
+
+current_dir = os.path.dirname(__file__)
+model_dir = os.path.join(current_dir, "saved_model")
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class QNetwork(nn.Module):
     def __init__(self, state_dim, action_dim):
         super(QNetwork, self).__init__()
-        self.fc1 = nn.Linear(state_dim, 64)
-        self.fc2 = nn.Linear(64, 32)
-        self.fc3 = nn.Linear(32, action_dim)
+        self.fc1 = nn.Linear(state_dim, 128)
+        self.fc2 = nn.Linear(128, 128)
+        self.fc3 = nn.Linear(128, 64)
+        self.fc4 = nn.Linear(64, action_dim)
 
     def forward(self, x):
         x = torch.relu(self.fc1(x))
         x = torch.relu(self.fc2(x))
-        return self.fc3(x)
+        x = torch.relu(self.fc3(x))
+        return self.fc4(x)
 
 class DQNAgent:
     def __init__(self, state_dim, action_dim, lr, gamma, epsilon, epsilon_decay, min_epsilon, buffer_size, batch_size):
@@ -56,7 +61,7 @@ class DQNAgent:
     def get_action(self, state):
         # 탐색 비율에 따라 무작위 행동 선택 또는 Q 네트워크를 사용하여 행동 선택
         if np.random.rand() < self.epsilon:
-           action = random.randrange(self.action_dim)
+            action = random.randrange(self.action_dim)
         else:
             # 상태를 텐서로 변환하고 Q 네트워크를 사용하여 행동 값 계산
             state = torch.FloatTensor(state).unsqueeze(0).to(device)
@@ -108,14 +113,14 @@ class DQNAgent:
         self.epsilon = max(self.min_epsilon, self.epsilon * self.epsilon_decay)
 
 # Hyperparameters
-episodes = 500
-lr = 0.01 # 0.001
-gamma = 0.98 # 0.98
+episodes = 300
+lr = 0.001
+gamma = 0.98
 epsilon = 1.0
 epsilon_decay = 0.98
-min_epsilon = 0.001
-buffer_size = 100000
-batch_size = 200 # 64
+min_epsilon = 0.01
+buffer_size = 10000
+batch_size = 64
 update_target_frequency = 10
 train_socre = []
 
@@ -154,7 +159,4 @@ for episode in range(episodes):
     print(f"Episode {episode + 1}, Total Reward: {total_reward}, Epsilon: {agent.epsilon}")
 
 # 학습된 모델 저장
-torch.save(agent.q_network.state_dict(), 'Pendulum/save_model/dqn_pendulum.pth')
-
-# 학습된 score 저장
-np.savetxt('Pendulum/score_log/pendulum_score_DQN.txt', train_socre)
+torch.save(agent.q_network.state_dict(), f"{model_dir}/dqn_pendulum.pth")

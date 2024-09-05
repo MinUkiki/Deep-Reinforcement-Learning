@@ -1,4 +1,4 @@
-import gymnasium as gym # 다른 환경을 사용할 때
+import gymnasium as gym
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -9,11 +9,11 @@ from torch.distributions import Normal
 from pendulum import PendulumEnv
 
 # Hyperparameters
-actor_learning_rate = 0.0003
-critic_learning_rate = 0.001
+actor_learning_rate = 0.00002
+critic_learning_rate = 0.0002
 gamma = 0.98
-n_rollout = 10
-model_dir = "Pendulum\saved_model"
+current_dir = os.path.dirname(__file__)
+model_dir = os.path.join(current_dir, "saved_model")
 
 # 디렉토리가 없으면 생성
 if not os.path.exists(model_dir):
@@ -23,11 +23,15 @@ class Actor(nn.Module):
     def __init__(self, state_dim, action_dim):
         super(Actor, self).__init__()
         self.fc1 = nn.Linear(state_dim, 256)
-        self.fc_mu = nn.Linear(256, action_dim)  # 액션의 평균값
-        self.fc_std = nn.Linear(256, action_dim)  # 액션의 표준편차
+        self.fc2 = nn.Linear(256, 128)
+        self.fc3 = nn.Linear(128, 64)
+        self.fc_mu = nn.Linear(64, action_dim)  # 액션의 평균값
+        self.fc_std = nn.Linear(64, action_dim)  # 액션의 표준편차
 
     def forward(self, x):
         x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = F.relu(self.fc3(x))
         mu = 2.0 * torch.tanh(self.fc_mu(x))  # 액션의 범위 [-2, 2]
         std = F.softplus(self.fc_std(x))  # 표준편차는 항상 양수여야 하므로 softplus 사용
         std = torch.clamp(std, min=1e-3)
@@ -37,10 +41,12 @@ class Critic(nn.Module):
     def __init__(self, state_dim):
         super(Critic, self).__init__()
         self.fc1 = nn.Linear(state_dim, 256)
-        self.fc_v = nn.Linear(256, 1)  # 상태 가치 함수
+        self.fc2 = nn.Linear(256, 128)
+        self.fc_v = nn.Linear(128, 1)  # 상태 가치 함수
 
     def forward(self, x):
         x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
         v = self.fc_v(x)
         return v
 
@@ -50,32 +56,8 @@ class ActorCriticAgent:
         self.critic = Critic(state_dim)
         self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=actor_learning_rate)
         self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=critic_learning_rate)
-        self.data = []
 
-    def put_data(self, transition):
-        self.data.append(transition)
-
-    def make_batch(self):
-        s_lst, a_lst, r_lst, s_prime_lst, done_lst = [], [], [], [], []
-        for transition in self.data:
-            s, a, r, s_prime, done = transition
-            s_lst.append(s)
-            a_lst.append([a])
-            r_lst.append([(r + 8) / 8])
-            s_prime_lst.append(s_prime)
-            done_mask = 0.0 if done else 1.0
-            done_lst.append([done_mask])
-
-        s_batch = torch.tensor(s_lst, dtype=torch.float32)
-        a_batch = torch.tensor(a_lst, dtype=torch.float32)
-        r_batch = torch.tensor(r_lst, dtype=torch.float32)
-        s_prime_batch = torch.tensor(s_prime_lst, dtype=torch.float32)
-        done_batch = torch.tensor(done_lst, dtype=torch.float32)
-        self.data = []
-        return s_batch, a_batch, r_batch, s_prime_batch, done_batch
-
-    def train_net(self):
-        s, a, r, s_prime, done = self.make_batch()
+    def train_net(self, s, a, r, s_prime, done):
         td_target = r + gamma * self.critic(s_prime) * done
         delta = td_target - self.critic(s)
 
@@ -109,27 +91,27 @@ def main():
         done = False
         s, _ = env.reset()
         while not done:
-            for t in range(n_rollout):
-                mu, std = agent.actor(torch.from_numpy(s).float())
-                dist = Normal(mu, std)
-                a = dist.sample()
-                a = torch.clamp(a, -2.0, 2.0)  # 액션을 [-2, 2]로 클램핑
-                s_prime, r, terminated, truncated, _ = env.step(np.array([a.item()], dtype=np.float32))
-                done = terminated or truncated
-                agent.put_data((s, a.item(), r, s_prime, done))
+            mu, std = agent.actor(torch.from_numpy(s).float())
+            dist = Normal(mu, std)
+            a = dist.sample()
+            a = torch.clamp(a, -2.0, 2.0)  # 액션을 [-2, 2]로 클램핑
+            s_prime, r, terminated, truncated, _ = env.step(np.array([a.item()], dtype=np.float32))
+            done = terminated or truncated
 
-                s = s_prime
-                score += r
+            # Actor-Critic은 각 스텝마다 네트워크를 업데이트합니다.
+            agent.train_net(torch.from_numpy(s).float(), torch.tensor(a).float(), r, torch.from_numpy(s_prime).float(), 0.0 if done else 1.0)
 
-                if done:
-                    break
+            s = s_prime
+            score += r
 
-            agent.train_net()
+            if done:
+                break
 
         if n_epi % print_interval == 0 and n_epi != 0:
             print(f"# of episode :{n_epi}, avg score : {score / print_interval:.1f}")
             score = 0.0
 
+        # 모델 저장
         if n_epi % 100 == 0 and n_epi != 0:
             torch.save(agent.actor.state_dict(), f"{model_dir}/{n_epi}_actor.pth")
             torch.save(agent.critic.state_dict(), f"{model_dir}/{n_epi}_critic.pth")

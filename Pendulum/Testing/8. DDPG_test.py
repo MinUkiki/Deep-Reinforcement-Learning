@@ -1,23 +1,28 @@
 # DDPG test
 
 import gymnasium as gym
-import torch
+import torch, os
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
-# Actor 네트워크 정의 (MuNet)
+current_dir = os.path.dirname(__file__)
+model_dir = os.path.join(current_dir, "../saved_model")
+
+# 액터 네트워크 (정책 네트워크)
 class MuNet(nn.Module):
     def __init__(self, state_dim, action_dim):
         super(MuNet, self).__init__()
-        self.fc1 = nn.Linear(state_dim, 128)
-        self.fc2 = nn.Linear(128, 64)
-        self.fc_mu = nn.Linear(64, action_dim)
+        self.fc1 = nn.Linear(state_dim, 256)
+        self.fc2 = nn.Linear(256, 128)
+        self.fc3 = nn.Linear(128, 128)
+        self.fc_mu = nn.Linear(128, action_dim)
 
     def forward(self, x):
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
-        mu = torch.tanh(self.fc_mu(x)) * 2  # Pendulum-v1의 액션 범위는 [-2, 2]
+        x = F.relu(self.fc3(x))
+        mu = torch.tanh(self.fc_mu(x)) * 2
         return mu
 
 # 테스트 환경 설정
@@ -29,7 +34,7 @@ action_dim = env.action_space.shape[0]
 
 # Actor 네트워크 초기화 및 모델 로드
 actor_net = MuNet(state_dim, action_dim)
-actor_net.load_state_dict(torch.load('Pendulum\save_model\ddpg_actor_final.pth'))
+actor_net.load_state_dict(torch.load(f'{model_dir}\ddpg_actor_final.pth'))
 actor_net.eval()  # 평가 모드로 전환
 
 num_test_episodes = 10
