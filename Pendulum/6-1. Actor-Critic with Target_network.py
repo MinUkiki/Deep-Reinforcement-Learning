@@ -8,8 +8,8 @@ from torch.distributions import Normal
 from pendulum import PendulumEnv
 
 # Hyperparameters
-actor_learning_rate = 0.00003
-critic_learning_rate = 0.0002
+actor_learning_rate = 0.0004
+critic_learning_rate = 0.002
 gamma = 0.98
 n_rollout = 10
 target_update_interval = 10  # Target network 업데이트 주기
@@ -64,8 +64,10 @@ class ActorCriticAgent:
         self.data = []
 
     def update_target_network(self):
-        """Target Critic 네트워크를 Critic 네트워크의 가중치로 업데이트"""
-        self.target_critic.load_state_dict(self.critic.state_dict())
+        """Target Critic 네트워크를 Critic 네트워크의 가중치로 소프트 업데이트"""
+        tau = 0.01  # 소프트 업데이트 계수
+        for target_param, param in zip(self.target_critic.parameters(), self.critic.parameters()):
+            target_param.data.copy_(tau * param.data + (1 - tau) * target_param.data)
 
     def put_data(self, transition):
         self.data.append(transition)
@@ -89,7 +91,10 @@ class ActorCriticAgent:
         self.data = []
         return s_batch, a_batch, r_batch, s_prime_batch, done_batch
 
-    def train_net(self, n_epi):
+    def train_net(self):
+        if len(self.data) == 0:
+            return
+
         s, a, r, s_prime, done = self.make_batch()
         td_target = r + gamma * self.target_critic(s_prime) * done  # Target Network를 사용하여 TD Target 계산
         critic_loss = F.smooth_l1_loss(self.critic(s), td_target.detach())
@@ -99,20 +104,21 @@ class ActorCriticAgent:
         critic_loss.backward()
         self.critic_optimizer.step()
 
-        # Actor 업데이트
+        # Actor 업데이트: 현재 Critic이 평가한 Q-value를 최대화
         mu, std = self.actor(s)
         dist = Normal(mu, std)
-        log_prob = dist.log_prob(a)
-        actor_loss = -log_prob * (td_target - self.critic(s)).detach()
+        a = dist.rsample()  # reparameterization trick
+        log_prob = dist.log_prob(a).sum(dim=-1, keepdim=True)  # 다차원 행동에 대해 로그 확률의 합 계산
+        q_val = self.critic(s)  # Critic이 평가한 Q-value
+        actor_loss = -(log_prob * q_val.detach()).mean()
 
         self.actor_optimizer.zero_grad()
-        actor_loss.mean().backward()
+        actor_loss.backward()
         self.actor_optimizer.step()
 
-        # 일정 주기마다 Target Critic 네트워크 업데이트
-        if n_epi % target_update_interval == 0:
-            self.update_target_network()
-
+        # Target Critic 네트워크의 소프트 업데이트  
+        self.update_target_network()
+        
 def main():
     # env = gym.make('Pendulum-v1')
     env = PendulumEnv()
@@ -125,6 +131,8 @@ def main():
     for n_epi in range(3000):
         done = False
         s, _ = env.reset()
+        I = 1.0  # 초기 I 값 설정 (초기 값은 1)
+
         while not done:
             for t in range(n_rollout):
                 mu, std = agent.actor(torch.from_numpy(s).float())
@@ -133,15 +141,16 @@ def main():
                 a = torch.clamp(a, -2.0, 2.0)  # 액션을 [-2, 2]로 클램핑
                 s_prime, r, terminated, truncated, _ = env.step(np.array([a.item()], dtype=np.float32))
                 done = terminated or truncated
-                agent.put_data((s, a.item(), r, s_prime, done))
+                agent.put_data((s, a.item(), r * I, s_prime, done))  # 할인 계수를 적용한 보상
 
                 s = s_prime
                 score += r
+                I *= gamma  # 시간 할인 계수 업데이트
 
                 if done:
                     break
 
-            agent.train_net(n_epi)
+                agent.train_net()
 
         if n_epi % print_interval == 0 and n_epi != 0:
             print("# of episode :{}, avg score : {:.1f}".format(n_epi, score / print_interval))
@@ -159,3 +168,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

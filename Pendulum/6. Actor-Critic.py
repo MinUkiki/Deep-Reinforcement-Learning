@@ -9,8 +9,8 @@ from torch.distributions import Normal
 from pendulum import PendulumEnv
 
 # Hyperparameters
-actor_learning_rate = 0.00002
-critic_learning_rate = 0.0002
+actor_learning_rate = 0.0002
+critic_learning_rate = 0.002
 gamma = 0.98
 current_dir = os.path.dirname(__file__)
 model_dir = os.path.join(current_dir, "saved_model")
@@ -42,11 +42,13 @@ class Critic(nn.Module):
         super(Critic, self).__init__()
         self.fc1 = nn.Linear(state_dim, 256)
         self.fc2 = nn.Linear(256, 128)
-        self.fc_v = nn.Linear(128, 1)  # 상태 가치 함수
+        self.fc3 = nn.Linear(128, 64)
+        self.fc_v = nn.Linear(64, 1)  # 상태 가치 함수
 
     def forward(self, x):
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
+        x = F.relu(self.fc3(x))
         v = self.fc_v(x)
         return v
 
@@ -90,6 +92,8 @@ def main():
     for n_epi in range(1500):
         done = False
         s, _ = env.reset()
+        I = 1.0
+
         while not done:
             mu, std = agent.actor(torch.from_numpy(s).float())
             dist = Normal(mu, std)
@@ -99,10 +103,17 @@ def main():
             done = terminated or truncated
 
             # Actor-Critic은 각 스텝마다 네트워크를 업데이트합니다.
-            agent.train_net(torch.from_numpy(s).float(), torch.tensor(a).float(), r, torch.from_numpy(s_prime).float(), 0.0 if done else 1.0)
+            agent.train_net(
+                torch.from_numpy(s).float(),
+                torch.tensor(a).float(),
+                r * I,
+                torch.from_numpy(s_prime).float(),
+                0.0 if done else 1.0
+            )
 
             s = s_prime
             score += r
+            I *= gamma 
 
             if done:
                 break
