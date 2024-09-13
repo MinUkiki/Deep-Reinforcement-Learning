@@ -1,7 +1,12 @@
 import gymnasium as gym
-import torch, os
+import torch, os, sys
 import numpy as np
 import torch.nn as nn
+
+env_dir= os.path.dirname(os.path.abspath(__file__))
+pendulm_dir = os.path.dirname(env_dir)
+sys.path.append(pendulm_dir)
+from pendulum import PendulumEnv
 
 current_dir = os.path.dirname(__file__)
 model_dir = os.path.join(current_dir, "../saved_model")
@@ -20,8 +25,7 @@ class QNetwork(nn.Module):
         x = torch.relu(self.fc3(x))
         return self.fc4(x)
     
-# env = gym.make('Pendulum-v1')
-env = gym.make('Pendulum-v1', render_mode='human')
+env = PendulumEnv(render_mode='human')
 # 네트워크 초기화
 state_dim = env.observation_space.shape[0]
 action_dim = 11

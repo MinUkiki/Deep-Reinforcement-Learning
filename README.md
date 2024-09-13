@@ -1,6 +1,6 @@
 # Deep Reinforcement Learning
 
-<!-- install anaconda [here](https://minukiki.github.io/other/Anaconda_install/) -->
+install anaconda [here](https://minukiki.github.io/other/Anaconda_install/)
 
 python==3.11.9
 
