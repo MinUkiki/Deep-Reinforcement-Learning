@@ -23,11 +23,11 @@ class Policy(nn.Module):
         super(Policy, self).__init__()
         self.data = []
 
-        self.fc1 = nn.Linear(state_dim, 128)  # Pendulum 환경의 상태 공간 크기는 3
-        self.fc2 = nn.Linear(128, 128)
-        self.fc3 = nn.Linear(128, 64)
-        self.fc_mean = nn.Linear(64, action_dim)   # 액션의 표준편차
-        self.fc_std = nn.Linear(64, action_dim)   # 액션의 표준편차
+        self.fc1 = nn.Linear(state_dim, 256)  # Pendulum 환경의 상태 공간 크기는 3
+        self.fc2 = nn.Linear(256, 256)
+        self.fc3 = nn.Linear(256, 128)
+        self.fc_mean = nn.Linear(128, action_dim)   # 액션의 표준편차
+        self.fc_std = nn.Linear(128, action_dim)   # 액션의 표준편차
         self.optimizer = optim.Adam(self.parameters(), lr=learning_rate)
 
     def forward(self, x):
@@ -56,10 +56,10 @@ class Policy(nn.Module):
 class Critic(nn.Module):
     def __init__(self, state_dim, action_dim):
         super(Critic, self).__init__()
-        self.fc1 = nn.Linear(state_dim, 128)
-        self.fc2 = nn.Linear(128, 128)
-        self.fc3 = nn.Linear(128, 64)
-        self.fc4 = nn.Linear(64, 1)
+        self.fc1 = nn.Linear(state_dim, 256)
+        self.fc2 = nn.Linear(256, 256)
+        self.fc3 = nn.Linear(256, 128)
+        self.fc4 = nn.Linear(128, 1)
         self.optimizer = optim.Adam(self.parameters(), lr=learning_rate)
 
     def forward(self, x):

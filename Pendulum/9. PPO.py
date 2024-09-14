@@ -15,7 +15,7 @@ lmbda = 0.9
 eps_clip = 0.2
 K_epoch = 10
 rollout_len = 3
-buffer_size = 10
+buffer_size = 16
 minibatch_size = 128
 
 # 경로 설정
@@ -163,7 +163,7 @@ def main():
     print_interval = 20
     rollout = []
 
-    for n_epi in range(1500):
+    for n_epi in range(3000):
         s, _ = env.reset()
         done = False
         count = 0

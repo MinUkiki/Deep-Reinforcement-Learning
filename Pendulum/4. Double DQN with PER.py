@@ -27,8 +27,8 @@ class QNetwork(nn.Module):
     def __init__(self, state_dim, action_dim):
         super(QNetwork, self).__init__()
         self.fc1 = nn.Linear(state_dim, 256)
-        self.fc2 = nn.Linear(256, 128)
-        self.fc3 = nn.Linear(128, 128)
+        self.fc2 = nn.Linear(256, 256)
+        self.fc3 = nn.Linear(256, 128)
         self.fc4 = nn.Linear(128, action_dim)
 
     def forward(self, x):
@@ -118,7 +118,7 @@ class DoubleDQNAgent:
 
 # Hyperparameters
 BATCH_SIZE = 64
-REPLAY_MEMORY_SIZE = 10000
+REPLAY_MEMORY_SIZE = 50000
 GAMMA = 0.99
 ALPHA = 0.6
 BETA_START = 0.4

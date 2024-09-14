@@ -24,8 +24,10 @@ class QNetwork(nn.Module):
         x = torch.relu(self.fc2(x))
         x = torch.relu(self.fc3(x))
         return self.fc4(x)
-    
+
+# 환경 
 env = PendulumEnv(render_mode='human')
+
 # 네트워크 초기화
 state_dim = env.observation_space.shape[0]
 action_dim = 11

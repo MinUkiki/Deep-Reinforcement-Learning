@@ -1,7 +1,12 @@
 import gymnasium as gym
-import torch, os
+import torch, os, sys
 import numpy as np
 import torch.nn as nn
+
+env_dir= os.path.dirname(os.path.abspath(__file__))
+pendulm_dir = os.path.dirname(env_dir)
+sys.path.append(pendulm_dir)
+from pendulum import PendulumEnv
 
 current_dir = os.path.dirname(__file__)
 model_dir = os.path.join(current_dir, "../saved_model")
@@ -11,8 +16,8 @@ class QNetwork(nn.Module):
     def __init__(self, state_dim, action_dim):
         super(QNetwork, self).__init__()
         self.fc1 = nn.Linear(state_dim, 256)
-        self.fc2 = nn.Linear(256, 128)
-        self.fc3 = nn.Linear(128, 128)
+        self.fc2 = nn.Linear(256, 256)
+        self.fc3 = nn.Linear(256, 128)
         self.fc4 = nn.Linear(128, action_dim)
 
     def forward(self, x):
@@ -22,7 +27,8 @@ class QNetwork(nn.Module):
         return self.fc4(x)
     
 # env = gym.make('Pendulum-v1')
-env = gym.make('Pendulum-v1', render_mode='human')
+env = PendulumEnv(render_mode='human')
+
 # 네트워크 초기화
 state_dim = env.observation_space.shape[0]
 action_dim = 11
@@ -45,7 +51,7 @@ num_test_episodes = 10
 total_rewards = []
 
 # 파일 열기 (쓰기 모드)
-with open("test_dqn.txt", "w") as file:
+with open("test_double_dqn.txt", "w") as file:
     for episode in range(num_test_episodes):
         state, _ = env.reset()
         done = False

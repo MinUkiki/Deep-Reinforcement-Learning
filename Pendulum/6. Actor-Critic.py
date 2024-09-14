@@ -9,7 +9,7 @@ from torch.distributions import Normal
 from pendulum import PendulumEnv
 
 # Hyperparameters
-actor_learning_rate = 0.0002
+actor_learning_rate = 0.0008
 critic_learning_rate = 0.002
 gamma = 0.98
 current_dir = os.path.dirname(__file__)
@@ -24,9 +24,9 @@ class Actor(nn.Module):
         super(Actor, self).__init__()
         self.fc1 = nn.Linear(state_dim, 256)
         self.fc2 = nn.Linear(256, 128)
-        self.fc3 = nn.Linear(128, 64)
-        self.fc_mu = nn.Linear(64, action_dim)  # 액션의 평균값
-        self.fc_std = nn.Linear(64, action_dim)  # 액션의 표준편차
+        self.fc3 = nn.Linear(128, 128)
+        self.fc_mu = nn.Linear(128, action_dim)  # 액션의 평균값
+        self.fc_std = nn.Linear(128, action_dim)  # 액션의 표준편차
 
     def forward(self, x):
         x = F.relu(self.fc1(x))
@@ -42,8 +42,8 @@ class Critic(nn.Module):
         super(Critic, self).__init__()
         self.fc1 = nn.Linear(state_dim, 256)
         self.fc2 = nn.Linear(256, 128)
-        self.fc3 = nn.Linear(128, 64)
-        self.fc_v = nn.Linear(64, 1)  # 상태 가치 함수
+        self.fc3 = nn.Linear(128, 128)
+        self.fc_v = nn.Linear(128, 1)  # 상태 가치 함수
 
     def forward(self, x):
         x = F.relu(self.fc1(x))

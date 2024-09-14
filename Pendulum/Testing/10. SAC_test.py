@@ -1,10 +1,15 @@
 # SAC test
 import gymnasium as gym
-import torch, os
+import torch, os, sys
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Normal
 import numpy as np
+
+env_dir= os.path.dirname(os.path.abspath(__file__))
+pendulm_dir = os.path.dirname(env_dir)
+sys.path.append(pendulm_dir)
+from pendulum import PendulumEnv
 
 current_dir = os.path.dirname(__file__)
 model_dir = os.path.join(current_dir, "../saved_model")
@@ -28,7 +33,7 @@ class Actor(nn.Module):
         return real_action, real_log_prob
 
 # 테스트 환경 설정
-env = gym.make('Pendulum-v1')
+env = PendulumEnv(render_mode='human')
 
 # 저장된 모델 로드
 state_dim = env.observation_space.shape[0]

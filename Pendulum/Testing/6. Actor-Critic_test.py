@@ -1,9 +1,14 @@
 # Actor Critic test
 import gymnasium as gym
-import torch, os
+import torch, os, sys
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
+
+env_dir= os.path.dirname(os.path.abspath(__file__))
+pendulm_dir = os.path.dirname(env_dir)
+sys.path.append(pendulm_dir)
+from pendulum import PendulumEnv
 
 current_dir = os.path.dirname(__file__)
 model_dir = os.path.join(current_dir, "../saved_model")
@@ -13,19 +18,21 @@ class Actor(nn.Module):
         super(Actor, self).__init__()
         self.fc1 = nn.Linear(state_dim, 256)
         self.fc2 = nn.Linear(256, 128)
+        self.fc3 = nn.Linear(128, 128)
         self.fc_mu = nn.Linear(128, action_dim)  # 액션의 평균값
         self.fc_std = nn.Linear(128, action_dim)  # 액션의 표준편차
 
     def forward(self, x):
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
+        x = F.relu(self.fc3(x))
         mu = 2.0 * torch.tanh(self.fc_mu(x))  # 액션의 범위 [-2, 2]
         std = F.softplus(self.fc_std(x))  # 표준편차는 항상 양수여야 하므로 softplus 사용
         std = torch.clamp(std, min=1e-3)
         return mu, std
 
 # 테스트 환경 설정
-env = gym.make('Pendulum-v1', render_mode='human')
+env = PendulumEnv(render_mode='human')
 
 # 저장된 모델 로드
 state_dim = env.observation_space.shape[0]
